@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<!-- 
+    Hello curious and fellow nerd, welcome to the source code! You can find platform-relevant parts by
+    searching for #ATTN, everything else is just supporting UI stuff
+-->
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ofte - Basic Demo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.1/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.1.0/js/all.js"></script>
+
+    <!-- #ATTN This is JS library for the OfteKey. You have to load this and then initialize it (see below) -->
+    <script src="/ofte.js"></script>
+    <style>
+        .hidden {
+            display: none;
+        }
+
+        .login {
+            font-family: 'Open Sans', serif;
+            font-size: 14px;
+            font-weight: 300;
+        }
+
+        .box {
+            margin-top: 5rem;
+        }
+
+        .avatar {
+            margin-top: -70px;
+            padding-bottom: 20px;
+        }
+
+        .avatar img {
+            padding: 5px;
+            background: #fff;
+            border-radius: 50%;
+            -webkit-box-shadow: 0 2px 3px rgba(10, 10, 10, .1), 0 0 0 1px rgba(10, 10, 10, .1);
+            box-shadow: 0 2px 3px rgba(10, 10, 10, .1), 0 0 0 1px rgba(10, 10, 10, .1);
+        }
+
+        input {
+            font-weight: 300;
+        }
+
+        .box p {
+            font-weight: 700;
+        }
+
+        p.subtitle {
+            padding-top: 1rem;
+        }
+
+        .sidebar {
+            font-family: 'Nexa Book', serif;
+            font-weight: 700;
+            background-color: #efefef;
+            border-width: 1px;
+            border-color: black;
+            height: 2000px;
+            margin: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <div class="columns">
+            <div id="sidebar" class="column is-one-fifth sidebar">
+                <img src="https://ofte.io/img/ofte-logo.svg" width="100" />
+                <h4 class="title is-4">Basic Demo: Login</h4>
+                <p class="content">
+                    This is the minimalistic Ofte demo. No frameworks, no jQuery. Here's a fictitious corporate portal
+                    for the infamous E-Corp (for you Mr. Robot fans). Fitting as in the show, all the world's problems
+                    begin with
+                    a brute force password attack. Behind this login page is a dashboard with access
+                    to all sorts of sensitive E-Corp information.
+                </p>
+                <p class="content">
+                    Of course, you'll need an Ofte Key and a valid login, email <a href="mailto:info@ofte.io">info@ofte.io</a>
+                    for help. Although not always the case, this demo is configured such that a user will need to have
+                    their Ofte Key plugged in before a login
+                    attempt is validated. The password for all logins is <span style="font-family: 'Courier New', Courier, monospace">mrrobot</span>.
+                </p>
+                <p class="content">
+                    <a class="button is-small" style="width:100%;" onclick="document.getElementById('uid').value='elliot.alderson@e-corp-usa.com';document.getElementById('password').value='mrrobot'">Insert
+                        Elliot Alderson's credentials >></a><br>
+                    <a class="button is-small" style="width:100%;" onclick="document.getElementById('uid').value='angela.moss@e-corp-usa.com';document.getElementById('password').value='mrrobot'">Insert
+                        Angela Moss' credentials >></a>
+                    <a class="button is-small" style="width:100%;" onclick="document.getElementById('uid').value='tyrell.wellick@e-corp-usa.com';document.getElementById('password').value='mrrobot'">Insert
+                        Tyrell Wellick's credentials >></a>
+                </p>
+                <p class="content">
+                    Events from various Ofte states will appear below.
+                </p>
+                <!-- Not found -->
+                <article class="message is-small hidden" id="ofte-device-notfound">
+                    <div class="message-body">
+                        no OfteKey was found. There are three possible states:
+                        <div class="content">
+                            <ul class="content is-small">
+                                <li>You have a device plugged in, but you haven't paired it
+                                    <br>
+                                    <a class="button is-outlined is-small" onclick="ofte.pairDevice()">Pair it</a>
+                                </li>
+                                <li>You have paired a device, but you haven't plugged it in yet</li>
+                                <li>You have a device that's not paired, and not plugged in</li>
+                            </ul>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Discovered -->
+                <article class="message is-small hidden" id="ofte-device-discovered">
+                    <div class="message-body">
+                        a plugged in OfteKey was found
+                    </div>
+                </article>
+
+                <!-- Plugged In -->
+                <article class="message is-small hidden" id="ofte-device-plugged">
+                    <div class="message-body">
+                        an OfteKey was plugged in
+                    </div>
+                </article>
+
+                <!-- Paired -->
+                <article class="message is-small hidden" id="ofte-device-paired">
+                    <div class="message-body">
+                        a plugged in OfteKey was paired
+                    </div>
+                </article>
+
+                <!-- Opened -->
+                <article class="message is-small hidden" id="ofte-device-opened">
+                    <div class="message-body">
+                        a plugged in OfteKey was opened
+                    </div>
+                </article>
+
+                <!-- Device Inited -->
+                <article class="message is-small hidden" id="ofte-device-inited">
+                    <div class="message-body">
+                        a plugged in OfteKey initialized an encrypted message
+                    </div>
+                </article>
+
+                <!-- Service Inited -->
+                <article class="message is-small hidden" id="ofte-service-inited">
+                    <div class="message-body">
+                        the OfteKey successfully initialized to the service
+                    </div>
+                </article>
+
+                <!-- Device Processed -->
+                <article class="message is-small hidden" id="ofte-device-processed">
+                    <div class="message-body">
+                        a plugged in OfteKey processed an encrypted message
+                    </div>
+                </article>
+
+                <!-- Service Processed -->
+                <article class="message is-small hidden" id="ofte-service-processed">
+                    <div class="message-body">
+                        the Ofte service processed an encrypted message
+                        <br>
+                        <br>
+                        <div class="control">
+                            <div class="tags has-addons">
+                                <span class="tag is-dark">message count</span>
+                                <span id="countTag" class="tag is-info">1</span>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Device Erred -->
+                <article class="message is-danger hidden" id="ofte-device-erred">
+                    <div class="message-body">
+                        the OfteKey encountered an error
+                    </div>
+                    <div id="deviceErrorMsg" class="message-body">
+
+                    </div>
+                </article>
+
+                <!-- Service Erred -->
+                <article class="message is-danger hidden" id="ofte-service-erred">
+                    <div class="message-body">
+                        an error occurred in the Ofte service
+                    </div>
+                    <div id="serviceErrorMsg" class="message-body">
+
+                    </div>
+                </article>
+
+                <!-- Network Erred -->
+                <article class="message is-danger hidden" id="ofte-network-erred">
+                    <div class="message-body">
+                        a network error occurred
+                    </div>
+                    <div id="networkErrorMsg" class="message-body">
+
+                    </div>
+                </article>
+
+            </div>
+            <div class="column">
+                <span class="icon is-large" onclick="toggleSidebar()">
+                    <i id="chevron" class="fas fa-lg fa-chevron-circle-left"></i>
+                </span>
+                <div class="container login has-text-centered">
+                    <div class="column is-4 is-offset-4">
+                        <h3 class="title has-text-grey">E-Corp</h3>
+                        <p class="subtitle has-text-grey">Corporate Portal</p>
+                        <div class="box">
+                            <figure class="avatar">
+                                <img src="https://static1.squarespace.com/static/571a9b3cd51cd4f1ca1c03b5/t/576d824779a5a2d4946bff6a/1466795505878/Evil_Corp_logo.png">
+                            </figure>
+                            <!-- #ATTN, here's login 'form'. Note that it's not actually a form per se, because we're using XHR to post credentials -->
+                            <div>
+                                <div class="field">
+                                    <div class="control">
+                                        <input name="uid" id="uid" class="input is-medium" type="email" placeholder="Email"
+                                            autofocus="">
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <div class="control">
+                                        <input name="password" id="password" class="input is-medium" type="password"
+                                            placeholder="Password">
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <img id="notfoundbug" src="controls/notfoundbug.png" style="cursor: pointer;"
+                                        onclick="ofte.pairDevice()" />
+                                </div>
+                                <article id="errorWindow" class="message is-danger is-hidden">
+                                    <div class="message-header">
+                                        <p>Error</p>
+                                        <button class="delete" aria-label="delete"></button>
+                                    </div>
+                                    <div id="errorText" class="message-body">
+                                        Error authenticating
+                                    </div>
+                                </article>
+                                <button id="loginButton" class="button is-block is-info is-medium is-fullwidth"
+                                    disabled onClick="login()">Login</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        function login() {
+            let login = document.getElementById('uid').value;
+            let password = document.getElementById('password').value;
+            // #ATTN This call sends the login data, but through our Promise-based helper that sends
+            // a signed token for validation.
+            ofte.getFormResponseAuthorized('POST', '/v1/login', 'uid=' + login + '&password=' + password)
+                .then(() => {
+                    console.log('authorized...')
+                    window.location = 'dashboard.html'
+                })
+                .catch((err) => {
+                    console.log('Error logging in: ', err)
+                    document.getElementById('errorText').textContent = err.detail
+                    document.getElementById('errorWindow').classList.remove('is-hidden');
+                    ofte.reset()
+                })
+        }
+
+        // The rest of this script section are functions to support the demo. "Move along, nothing to see here"...
+        // -------------
+        function toggleSidebar() {
+            var element = document.getElementById('sidebar');
+            if (element.classList.contains('column')) {
+                element.classList.replace('column', 'is-hidden');
+                document.getElementById('chevron').classList.replace('fa-chevron-circle-left', 'fa-chevron-circle-right');
+            } else {
+                element.classList.replace('is-hidden', 'column');
+                document.getElementById('chevron').classList.replace('fa-chevron-circle-right', 'fa-chevron-circle-left');
+            }
+        }
+        function reveal(id) {
+            var element = document.getElementById(id);
+            element.classList.remove("hidden");
+        }
+        function hide(id) {
+            var element = document.getElementById(id);
+            element.classList.add("hidden");
+        }
+
+        ofte.on(ofte.eventDeviceNotFound, function (event) {
+            reveal(event.type)
+            document.getElementById('notfoundbug').classList.remove('is-hidden');
+            document.getElementById('loginButton').setAttribute('disabled', '');
+        });
+
+        ofte.on(ofte.eventDeviceDiscovered, function (event) { reveal(event.type) });
+        ofte.on(ofte.eventDevicePlugged, function (event) {
+            reveal(event.type)
+            hide(ofte.eventDeviceNotFound)
+        });
+        ofte.on(ofte.eventDeviceUnplugged, function (event) {
+            hide(ofte.eventDevicePlugged)
+            reveal(ofte.eventDeviceNotFound)
+            document.getElementById('notfoundbug').classList.remove('is-hidden');
+            document.getElementById('loginButton').setAttribute('disabled', '');
+        });
+        ofte.on(ofte.eventDevicePaired, function (event) { reveal(event.type) });
+        ofte.on(ofte.eventDeviceOpened, function (event) {
+            reveal(event.type)
+            document.getElementById('notfoundbug').classList.add('is-hidden');
+            document.getElementById('loginButton').removeAttribute('disabled');
+        });
+        ofte.on(ofte.eventDeviceInited, function (event) { reveal(event.type) });
+        ofte.on(ofte.eventDeviceProcessed, function (event) { reveal(event.type) });
+        ofte.on(ofte.eventSvcInited, function (event) { reveal(event.type) });
+        var count = 0;
+        ofte.on(ofte.eventSvcProcessed, function (event) {
+            reveal(event.type);
+            ++count;
+            element = document.getElementById('countTag');
+            element.textContent = Number(count).toLocaleString();
+        });
+        ofte.on(ofte.eventDeviceErred, function (event) {
+            reveal(event.type);
+            document.getElementById('deviceErrorMsg').textContent = event.detail;
+        });
+        ofte.on(ofte.eventSvcErred, function (event) {
+            reveal(event.type);
+            let msg = typeof (event.detail) === 'string' ? event.detail : event.detail.type;
+            document.getElementById('serviceErrorMsg').textContent = msg;
+            if (event.code == ofte.eventSvcErred) {
+                ofte.startSession();
+            }
+        });
+        ofte.on(ofte.eventNetworkErred, function (event) {
+            reveal(event.type);
+            let msg = typeof (event.detail) === 'string' ? event.detail : event.detail.type;
+            document.getElementById('networkErrorMsg').textContent = msg;
+        });
+
+        console.log("Demo OfteKeys/Logins:")
+        console.log("-----------------------------------------------")
+        console.log("OfteKey: FE030501 Login: angela.moss@e-corp-usa.com")
+        console.log("OfteKey: FE030504 Login: elliot.alderson@e-corp-usa.com")
+        console.log("OfteKey: 992507CF Login: tyrell.wellick@e-corp-usa.com")
+
+    </script>
+</body>
+
+</html>
