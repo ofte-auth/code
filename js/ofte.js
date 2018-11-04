@@ -1,6 +1,23 @@
 /*
-    Copyright (c) 2018, Ofte, LLC
-    See https://gitlab.com/ofte/code/raw/master/LICENSE for complete license details.
+Copyright (c) 2018, Ofte, LLC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 */
 
 /* eslint-disable */
@@ -45,13 +62,14 @@
 
         var impl = {}
         var config = {
-            serviceURL: 'https://demo.ofte.io:65443/v1',
+            serviceURL: 'https://demo.ofte.io:65443/v1',// the URL of the Ofte Auth Service (we'll supply this to you)
             interval: 1500,                             // the interval, in milliseconds, of continuous authentication
             adaptiveInterval: false,                    // if true, adapt the interval in accordance with network speed
             networkTimeout: 10000,                      // the timeout, in millseconds, for network requests
             autoStart: true,                            // if true, start authenticating as soon as the device is paired/opened
             debug: true                                 // if true, send debugging output to the console
         }
+        impl.config = config
 
         // ofkeKey is the USB Device handle
         var ofteKey = null
@@ -250,12 +268,18 @@
             })
         }
 
+        // getFormResponseAuthorized : Convenience function to handle Form posting. If an Ofte-session 
+        // is active, both the session uuid and one-time authorization token are written to HTTP headers.
+        // Your backend is responsible for validating these header values with the Ofte services.
         impl.getFormResponseAuthorized = function(method, url, data, timeout = config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/x-www-form-urlencoded", timeout, true)
             })
         }
 
+        // getJSONResponseAuthorized : Convenience function to handle submitting JSON data. If an Ofte-session 
+        // is active, both the session uuid and one-time authorization token are written to HTTP headers
+        // Your backend is responsible for validating these header values with the Ofte services.
         impl.getJSONResponseAuthorized = function (method, url, data, timeout = config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/json", timeout, true)
@@ -272,7 +296,12 @@
 
         async function getResponse(resolve, reject, method, url, data, contentType, timeout, token = false) {
             var xhr = new XMLHttpRequest()
-            xhr.open(method, url)
+            try {
+                xhr.open(method, url)
+            } catch (e) {
+                reject({code: statusNetworkError, detail: e})
+                return
+            }
             xhr.onload = function () {
                 if (this.status >= 200 && this.status < 300) {
                     resolve(this)
@@ -631,6 +660,26 @@
     if (typeof (window.ofte) === 'undefined') {
         window.ofte = Ofte()
 
+        var scripts = document.getElementsByTagName('script');
+        var lastScript = scripts[scripts.length-1];
+        window.ofte.config = {
+            serviceURL: lastScript.getAttribute("data-service-url") ? lastScript.getAttribute("data-service-url") : window.ofte.config.serviceURL,
+            interval: parseInt(lastScript.getAttribute("data-interval") ? lastScript.getAttribute("data-interval") : window.ofte.config.interval),
+            adaptiveInterval: lastScript.getAttribute("data-adaptive-interval") ? (lastScript.getAttribute("data-adaptive-interval") == 'true') : window.ofte.config.adaptiveInterval,
+            networkTimeout: parseInt(lastScript.getAttribute("data-network-timeout") ? lastScript.getAttribute("data-network-timeout") : window.ofte.config.networkTimeout),
+            autoStart: lastScript.getAttribute("data-autostart") ? (lastScript.getAttribute("data-autostart") == 'true') : window.ofte.config.autoStart,
+            debug: lastScript.getAttribute("data-debug") ? (lastScript.getAttribute("data-debug") == 'true') : window.ofte.config.debug
+        }
+        // TODO: validate passed config variables
+
+        window.ofte.getJSONResponse("GET", window.ofte.config.serviceURL + '/version')
+            .then(result => {
+                console.log('Ofte Auth Service version:', result.response)
+            })
+            .catch(err => {
+                console.log('error connecting to Ofte Auth Service', err)
+            })
+
         window.ofte.eventDeviceDiscovered = eventDeviceDiscovered
         window.ofte.eventDeviceNotFound = eventDeviceNotFound
         window.ofte.eventDeviceErred = eventDeviceErred
@@ -650,5 +699,3 @@
     }
 
 })(window)
-
-
