@@ -46,7 +46,7 @@ var config = {
 You can specify these parameters when loading the script by adding `data-<name>` attributes to the `script` tag. For instance, to set the `interval` to 2.5 seconds, you'd issue use this directive:
 
 ```javascript
-<script src="https://glcdn.githack.com/ofte/code/raw/latest/js/ofte.js" data-interval="2500"></script>
+<script src="https://glcdn.githack.com/ofte/code/raw/master/js/ofte.js" data-interval="2500"></script>
 ```
 
 Here are the <i>data attribute</i> tags and corresponding config attributes:
@@ -126,7 +126,7 @@ Note that it's just a **one-line change**. The Ofte helper functions extract a o
 
 ## Backend Services Integration
 
-Protecting your webapp's sensitive data using Ofte is designed to be as painless as possible. In a nutshell, if your frontend is using our helper functions (as described above), there will exist in those requests Ofte-specific headers that your backend services need to extract and validate with our services. It's a lot less complicated than it sounds. Here's an example in a Golang-based backend service using the popular gin-gonic framework.
+Protecting your webapp's sensitive data using Ofte is designed to be as painless as possible. In a nutshell, if your frontend is using our helper functions (as described above), in your requests will be Ofte-specific headers that your backend services need to extract and validate with our services. It's a lot less complicated than it sounds. Here's an example in a Golang-based backend service using the popular gin-gonic framework.
 
 Let's say this is your endpoint for a call to get your webapp's users (as illustrated above in JS example):
 
@@ -144,7 +144,7 @@ func main() {
 }
 ```
 
-Here's an example of simple middleware that checks for Ofte-based HTTP headers. No changes to your existing controllers would be necessary here, just add the middleware code. We are busily working away on libraries for a number of backend environments that'll make this even easier.
+Below is an example of simple middleware that checks for Ofte-based HTTP headers. No changes to your existing controllers would be necessary here, just add the middleware code. 
 
 ```golang
 
@@ -177,6 +177,6 @@ Here's an example of simple middleware that checks for Ofte-based HTTP headers. 
 
 So the difference here is the addition of that middleware starting on line 3 (which could be used across all your resource endpoints) and the injection of that middleware routine into your handler assignment on line 24.
 
-For Java-based backends, Spring MVC *interceptors* can be used in a similar way to check for HTTP Headers that need to be validated via REST to our services. Other language/environments use similar interceptor/middleware constructs and Ofte would integrate cleanly into those as well.
+For Java-based backends, Spring MVC *interceptors* can be used in a similar way to check for HTTP Headers that need to be validated via REST to our services. Other language/environments use similar interceptor/middleware constructs and Ofte would integrate cleanly into those as well. As demand for languages is made known, we'll add libraries for those environments in this repository.
 
 [Let us know](mailto:info@ofte.io) what environments you're interested in working with, and we'll prioritize those. And of course if you have questions, don't hesitate to open an issue or [mail us](mailto:info@ofte.io).
