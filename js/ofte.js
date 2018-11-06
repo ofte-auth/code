@@ -667,7 +667,7 @@ THE SOFTWARE.
             interval: parseInt(lastScript.getAttribute("data-interval") ? lastScript.getAttribute("data-interval") : window.ofte.config.interval),
             adaptiveInterval: lastScript.getAttribute("data-adaptive-interval") ? (lastScript.getAttribute("data-adaptive-interval") == 'true') : window.ofte.config.adaptiveInterval,
             networkTimeout: parseInt(lastScript.getAttribute("data-network-timeout") ? lastScript.getAttribute("data-network-timeout") : window.ofte.config.networkTimeout),
-            autoStart: lastScript.getAttribute("data-autostart") ? (lastScript.getAttribute("data-autostart") == 'true') : window.ofte.config.autoStart,
+            autoStart: lastScript.getAttribute("data-auto-start") ? (lastScript.getAttribute("data-auto-start") == 'true') : window.ofte.config.autoStart,
             debug: lastScript.getAttribute("data-debug") ? (lastScript.getAttribute("data-debug") == 'true') : window.ofte.config.debug
         }
         // TODO: validate passed config variables
