@@ -20,7 +20,7 @@ func OfteAuthenticate(endpoint string) gin.HandlerFunc {
 			return
 		}
 
-		resp, err := http.PostForm(endpoint+"/t", url.Values{"session": {session}, "token": {token})
+		resp, err := http.PostForm(endpoint+"/t", url.Values{"session": {session}, "token": {token}})
 		if resp.StatusCode != http.StatusOK || err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
