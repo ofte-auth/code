@@ -19,7 +19,7 @@ Ofte uses a Javascript library named `ofte.js` to initialize and communicate wit
 
 ```https://glcdn.githack.com/ofte/code/raw/master/js/ofte.js```
 
-You can find specific sematically tagged versions similarly:
+You can find specific sematically versioned releases similarly:
 
 ```https://glcdn.githack.com/ofte/code/raw/1.0.0/js/ofte.js```
 
@@ -148,34 +148,34 @@ Below is an example of simple middleware that checks for Ofte-based HTTP headers
 
 ```golang
 
-01  const ofteServicesEndpoint = "https://someurl.where.ofteservices.are.installed.com/v1/t"
+01  const ofteServicesEndpoint = "https://someurl.where.ofteservices.are.installed.com/v1"
 02  
 03  func ofteMiddleware(ctx *gin.Context) {
 04      session := ctx.Request.Header.Get("ofte-session")
 05      token := ctx.Request.Header.Get("ofte-token")
-06      uid := getPrincipalFromSession(ctx)
-07      resp, err := http.PostForm(ofteServiceEndpoint,
-08          url.Values{"session": {session}, "token": {token}, "uid": {uid}})  // REST call to our services
-09      if err != nil || resp.StatusCode != http.StatusOK {
-10          ctx.AbortWithStatus(http.StatusUnauthorized)
-12          return
-13      }
-14  }
-15
-16  func getUsers(ctx *gin.Context) {
-17      users := someCallToGetUsers()
-18      ctx.JSON(users)
-19  }
-20
-21  func main() {
-22      r := gin.Default()
-23      // Protected by Ofte
-24      r.GET("/users", ofteMiddleware, getUsers)
-25      r.Run()
-26  }
+06      // REST call to our services
+06      resp, err := http.PostForm(endpoint+"/t", url.Values{"session": {session}, "token": {token}})
+07      if err != nil || resp.StatusCode != http.StatusOK {
+08          ctx.AbortWithStatus(http.StatusUnauthorized)
+09          return
+10      }
+11      ctx.Next()
+12  }
+13
+14  func getUsers(ctx *gin.Context) {
+15      users := someCallToGetUsers()
+16      ctx.JSON(users)
+17  }
+18
+19  func main() {
+20      r := gin.Default()
+21      // Protected by Ofte
+22      r.GET("/users", ofteMiddleware, getUsers)
+23      r.Run()
+24  }
 ```
 
-So the difference here is the addition of that middleware starting on line 3 (which could be used across all your resource endpoints) and the injection of that middleware routine into your handler assignment on line 24.
+So the difference here is the addition of that middleware starting on line 3 (which could be used across all your resource endpoints) and the injection of that middleware routine into your handler assignment on line 22.
 
 For Java-based backends, Spring MVC *interceptors* can be used in a similar way to check for HTTP Headers that need to be validated via REST to our services. Other language/environments use similar interceptor/middleware constructs and Ofte would integrate cleanly into those as well. As demand for languages is made known, we'll add libraries for those environments in this repository.
 
