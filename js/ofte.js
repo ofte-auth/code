@@ -61,7 +61,7 @@ THE SOFTWARE.
         const tokenHeader = "ofte-token"
 
         var impl = {}
-        var config = {
+        impl.config = {
             serviceURL: 'https://demo.ofte.io:65443/v1',// the URL of the Ofte Auth Service (we'll supply this to you)
             interval: 1500,                             // the interval, in milliseconds, of continuous authentication
             adaptiveInterval: false,                    // if true, adapt the interval in accordance with network speed
@@ -69,7 +69,6 @@ THE SOFTWARE.
             autoStart: true,                            // if true, start authenticating as soon as the device is paired/opened
             debug: true                                 // if true, send debugging output to the console
         }
-        impl.config = config
 
         // ofkeKey is the USB Device handle
         var ofteKey = null
@@ -104,11 +103,11 @@ THE SOFTWARE.
         // --------- • ---------
 
         impl.setConfig = function (config) {
-            config = config
+            impl.config = config
         }
 
         impl.getConfig = function () {
-            return config
+            return impl.config
         }
 
         impl.on = function (eventName, func) {
@@ -123,7 +122,7 @@ THE SOFTWARE.
             if (ofteKey !== null) {
                 await closeDevice()
             }
-            if (config.debug) {
+            if (impl.config.debug) {
                 console.log("ofte: pairing device")
             }
             let err = null
@@ -143,14 +142,14 @@ THE SOFTWARE.
                     success = true
                 })
                 .catch((err) => {
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log('ofte: error opening/selecting device:', err)
                     }
                     success = false
                     ofteKey = null
                     handleEvent(eventDeviceErred, err)
                 })
-            if (success == true && config.autoStart) {
+            if (success == true && impl.config.autoStart) {
                 impl.startSession()
             }
             return success
@@ -168,7 +167,7 @@ THE SOFTWARE.
             await ofteKey.open()
                 .catch((err) => {
                     success = false
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log('ofte: error opening device:', err)
                     }
                     ofteKey = null
@@ -181,7 +180,7 @@ THE SOFTWARE.
                 await ofteKey.selectConfiguration(configuration)
                     .catch((err) => {
                         success = false
-                        if (config.debug) {
+                        if (impl.config.debug) {
                             console.log('ofte: error selecting device configuration:', err)
                         }
                         ofteKey = null
@@ -197,7 +196,7 @@ THE SOFTWARE.
                     handleEvent(eventDeviceOpened, ofteKey)
                 })
                 .catch((err) => {
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log('ofte: error claiming device interface:', err)
                     }
                     success = false
@@ -216,7 +215,7 @@ THE SOFTWARE.
             if (!ok) {
                 return
             }
-            if (config.debug) {
+            if (impl.config.debug) {
                 console.log("ofte: initialized")
             }
             ok = await process()
@@ -233,7 +232,7 @@ THE SOFTWARE.
         impl.reset = async function () {
             await endSession()
             let found = await discoverDevices()
-            if (found && config.autoStart) {
+            if (found && impl.config.autoStart) {
                 let opened = await impl.openDevice()
                 if (opened) {
                     impl.startSession()
@@ -246,7 +245,7 @@ THE SOFTWARE.
 
         // getDataResponse : Convenience function to handle generic databuffer POST requests, 
         // returning the http response via Promises
-        impl.getDataResponse = function (method, url, data, timeout = config.networkTimeout) {
+        impl.getDataResponse = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "arraybuffer", timeout)               
             })
@@ -254,7 +253,7 @@ THE SOFTWARE.
 
         // getFormResponse : Convenience function to handle generic FORM requests, 
         // returning the http response via Promises
-        impl.getFormResponse = function (method, url, data, timeout = config.networkTimeout) {
+        impl.getFormResponse = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/x-www-form-urlencoded", timeout)                
             })
@@ -262,7 +261,7 @@ THE SOFTWARE.
 
         // getJSONResponse : Convenience function to handle generic JSON requests, 
         // returning the http response via Promises
-        impl.getJSONResponse = function (method, url, data, timeout = config.networkTimeout) {
+        impl.getJSONResponse = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/json", timeout)
             })
@@ -271,7 +270,7 @@ THE SOFTWARE.
         // getFormResponseAuthorized : Convenience function to handle Form posting. If an Ofte-session 
         // is active, both the session uuid and one-time authorization token are written to HTTP headers.
         // Your backend is responsible for validating these header values with the Ofte services.
-        impl.getFormResponseAuthorized = function(method, url, data, timeout = config.networkTimeout) {
+        impl.getFormResponseAuthorized = function(method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/x-www-form-urlencoded", timeout, true)
             })
@@ -280,7 +279,7 @@ THE SOFTWARE.
         // getJSONResponseAuthorized : Convenience function to handle submitting JSON data. If an Ofte-session 
         // is active, both the session uuid and one-time authorization token are written to HTTP headers
         // Your backend is responsible for validating these header values with the Ofte services.
-        impl.getJSONResponseAuthorized = function (method, url, data, timeout = config.networkTimeout) {
+        impl.getJSONResponseAuthorized = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/json", timeout, true)
             })
@@ -353,19 +352,19 @@ THE SOFTWARE.
         async function discoverDevices() {
             let success = false
             let devices = await navigator.usb.getDevices()
-            if (config.debug) {
+            if (impl.config.debug) {
                 console.log('ofte: devices', devices)
             }
             devices.forEach(async device => {
                 if (device.vendorId == vendorId) {
                     ofteKey = device
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log('ofte: dispatching discovered', device)
                     }
                     handleEvent(eventDeviceDiscovered, device)
                     success = true
                 } else {
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log('ofte: ignoring device from', device.manufacturerName)
                     }
                 }
@@ -410,7 +409,7 @@ THE SOFTWARE.
                         handleEvent(eventDeviceReset)
                     })
                     .catch((err) => {
-                        if (config.debug) {
+                        if (impl.config.debug) {
                             console.log("ofte: error resetting device", err)
                         }
                     })
@@ -446,14 +445,14 @@ THE SOFTWARE.
                 // ---------------------------------------
                 .then(async (result) => {
                     handleEvent(eventDeviceInited)
-                    await impl.getDataResponse("POST", config.serviceURL + "/i", result.data.buffer)
+                    await impl.getDataResponse("POST", impl.config.serviceURL + "/i", result.data.buffer)
                         .then(function (resp) {
                             buffer = resp.response
                             if (buffer.byteLength != 16) {
                                 throw "invalid buffer size: " + buffer.byteLength
                             }
                             sessionID = resp.getResponseHeader(sessionHeader)
-                            if (config.debug) {
+                            if (impl.config.debug) {
                                 console.log("ofte: setting up sessionID:", sessionID)
                             }
                             if (sessionID == "") {
@@ -464,14 +463,14 @@ THE SOFTWARE.
                         })
                         .catch(function (err) {
                             handleEvent(eventSvcErred, err)
-                            if (config.debug) {
+                            if (impl.config.debug) {
                                 console.log("ofte: error initializing to server", err)
                             }
                         })
                 })
                 .catch((err) => {
                     handleEvent(eventDeviceErred, err)
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log("ofte: error initializing device", err)
                     }
                 })
@@ -510,7 +509,7 @@ THE SOFTWARE.
                         throw "invalid result from transferIn"
                     }
                     handleEvent(eventDeviceProcessed)
-                    await impl.getDataResponse("POST", config.serviceURL + "/p/" + sessionID, result.data.buffer)
+                    await impl.getDataResponse("POST", impl.config.serviceURL + "/p/" + sessionID, result.data.buffer)
                         .then(function (resp) {
                             buffer = resp.response
                             if (buffer.byteLength != 16) {
@@ -522,14 +521,14 @@ THE SOFTWARE.
                         .catch(function (err) {
                             handleEvent(eventSvcErred, err)
                             endSession()
-                            if (config.debug) {
+                            if (impl.config.debug) {
                                 console.log("ofte: error processing to server", err)
                             }
                         })
                 })
                 .catch((err) => {
                     handleEvent(eventDeviceErred, err)
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log("ofte: error processing to server", err)
                     }
                 })
@@ -569,7 +568,7 @@ THE SOFTWARE.
                 })
                 .catch((err) => {
                     handleEvent(eventDeviceErred, err)
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log("ofte: error processing signing result", err)
                     }
                 })
@@ -590,7 +589,7 @@ THE SOFTWARE.
                 clearInterval(timer)
                 return
             }
-            timer = setTimeout(processSessionWorker, config.interval)
+            timer = setTimeout(processSessionWorker, impl.config.interval)
         }
 
         // endSession: End the ofte session (user-agent initiated)
@@ -598,14 +597,14 @@ THE SOFTWARE.
             clearInterval(timer)
             await closeDevice()
             buffer = new ArrayBuffer(16)
-            await impl.getDataResponse("DELETE", config.serviceURL + "/p/" + sessionID)
+            await impl.getDataResponse("DELETE", impl.config.serviceURL + "/p/" + sessionID)
                 .then(function (resp) {
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log("ofte: deleted session: ", sessionID)
                     }
                 })
                 .catch(function (err) {
-                    if (config.debug) {
+                    if (impl.config.debug) {
                         console.log("ofte: error deleting to server", err)
                     }
                 })
@@ -614,7 +613,7 @@ THE SOFTWARE.
 
         document.addEventListener('DOMContentLoaded', async () => {
             let found = await discoverDevices()
-            if (found && config.autoStart) {
+            if (found && impl.config.autoStart) {
                 let opened = await impl.openDevice()
                 if (opened) {
                     await impl.startSession()
@@ -623,13 +622,13 @@ THE SOFTWARE.
         })
 
         navigator.usb.addEventListener('connect', async (event) => {
-            if (config.debug) {
+            if (impl.config.debug) {
                 console.log('ofte: device plugged in....', event.device)
             }
             if (event.device.vendorId === vendorId) {
                 ofteKey = event.device
                 handleEvent(eventDevicePlugged, event.device)
-                if (config.autoStart) {
+                if (impl.config.autoStart) {
                     let opened = await impl.openDevice()
                     if (opened) {
                         impl.startSession()
@@ -639,7 +638,7 @@ THE SOFTWARE.
         })
 
         navigator.usb.addEventListener('disconnect', (event) => {
-            if (config.debug) {
+            if (impl.config.debug) {
                 console.log("ofte: device unplugged")
             }
             ofteKey = null
