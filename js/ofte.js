@@ -42,16 +42,16 @@ THE SOFTWARE.
     let eventSvcErred = 'ofte-service-erred'             // the service encountered an error
     let eventNetworkErred = 'ofte-network-erred'         // a network error prevented init or processing
 
-    let statusNetworkError          = 460                // a general error with the network was encountered
-    let statusNetworkTimeout        = 461                // a timeout error was encountered with a network request
-	let statusInvalidTime           = 480                // the message timestamp was outside the allowed interval
-	let statusSessionNonceInvalid   = 481                // the session nonce was incorrect
-	let statusTokenNonceInvalid     = 482                // the token nonce was incorrect
-	let statusKeyIDNotFound         = 483                // the keyID was not found/available
-	let statusInvalidMessage        = 484                // the transmitted message was indecipherable
-	let statusSessionNotFound       = 485                // the session was not found
-    let statusValidationFailure     = 486                // the validation of a session failed
-    
+    let statusNetworkError = 460               // a general error with the network was encountered
+    let statusNetworkTimeout = 461             // a timeout error was encountered with a network request
+    let statusInvalidTime = 480                // the message timestamp was outside the allowed interval
+    let statusSessionNonceInvalid = 481        // the session nonce was incorrect
+    let statusTokenNonceInvalid = 482          // the token nonce was incorrect
+    let statusKeyIDNotFound = 483              // the keyID was not found/available
+    let statusInvalidMessage = 484             // the transmitted message was indecipherable
+    let statusSessionNotFound = 485            // the session was not found
+    let statusValidationFailure = 486          // the validation of a session failed
+
 
     function Ofte() {
         const vendorId = 0x16D0
@@ -99,17 +99,78 @@ THE SOFTWARE.
         events[eventSvcErred] = { desc: 'The ofte service encounted an error', callbacks: new Array() }
         events[eventNetworkErred] = { desc: 'A network error was encountered', callbacks: new Array() }
 
+        // Use a worker-based timer to get more consistent scheduling for setTimeout
+        // --------- • ---------
+
+        function workerBlob() {
+            var timers = {}
+
+            function fireTimeout(id) {
+                this.postMessage({ id: id })
+                delete timers[id]
+            }
+            
+            this.addEventListener("message", function (evt) {
+                var data = evt.data
+            
+                switch (data.command) {
+                    case "setTimeout":
+                        var time = parseInt(data.timeout || 0, 10),
+                            timer = setTimeout(fireTimeout.bind(null, data.id), time)
+                        timers[data.id] = timer
+                        break
+                    case "clearTimeout":
+                        var timer = timers[data.id]
+                        if (timer) clearTimeout(timer)
+                        delete timers[data.id]
+                }
+            })            
+        }
+
+        var timeoutId = 0
+        var timeouts = {}
+        let worker = new Worker(URL.createObjectURL(new Blob(["("+workerBlob.toString()+")()"], {type: 'text/javascript'})))
+
+        worker.addEventListener("message", function (evt) {
+            var data = evt.data,
+                id = data.id,
+                fn = timeouts[id].fn,
+                args = timeouts[id].args
+
+            fn.apply(null, args)
+            delete timeouts[id]
+        });
+
+        window.setTimeout = function (fn, delay) {
+            var args = Array.prototype.slice.call(arguments, 2)
+            timeoutId += 1
+            delay = delay || 0
+            var id = timeoutId
+            timeouts[id] = { fn: fn, args: args }
+            worker.postMessage({ command: "setTimeout", id: id, timeout: delay })
+            return id
+        };
+
+        window.clearTimeout = function (id) {
+            worker.postMessage({ command: "clearTimeout", id: id })
+            delete timeouts[id]
+        };
+
+
         // Public functions
         // --------- • ---------
 
+        // setConfig: updates the Ofte config
         impl.setConfig = function (config) {
             impl.config = config
         }
 
+        // getConfig: returns the Ofte config
         impl.getConfig = function () {
             return impl.config
         }
 
+        // on: associates an Ofte-event with a function
         impl.on = function (eventName, func) {
             if (!verifyEventName(eventName)) {
                 throw 'invalid event name ' + eventName
@@ -225,10 +286,12 @@ THE SOFTWARE.
             processSessionWorker()
         }
 
+        // endSession: resets the device and kills the remote session in the Ofte-service
         impl.endSession = async function () {
             await endSession()
         }
 
+        // reset: ends the session and then restarts if autoStart is true
         impl.reset = async function () {
             await endSession()
             let found = await discoverDevices()
@@ -237,7 +300,7 @@ THE SOFTWARE.
                 if (opened) {
                     impl.startSession()
                 }
-            }            
+            }
         }
 
         // Ofte-protected data retrieval functions
@@ -247,7 +310,7 @@ THE SOFTWARE.
         // returning the http response via Promises
         impl.getDataResponse = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
-                getResponse(resolve, reject, method, url, data, "arraybuffer", timeout)               
+                getResponse(resolve, reject, method, url, data, "arraybuffer", timeout)
             })
         }
 
@@ -255,7 +318,7 @@ THE SOFTWARE.
         // returning the http response via Promises
         impl.getFormResponse = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
-                getResponse(resolve, reject, method, url, data, "application/x-www-form-urlencoded", timeout)                
+                getResponse(resolve, reject, method, url, data, "application/x-www-form-urlencoded", timeout)
             })
         }
 
@@ -270,7 +333,7 @@ THE SOFTWARE.
         // getFormResponseAuthorized : Convenience function to handle Form posting. If an Ofte-session 
         // is active, both the session uuid and one-time authorization token are written to HTTP headers.
         // Your backend is responsible for validating these header values with the Ofte services.
-        impl.getFormResponseAuthorized = function(method, url, data, timeout = impl.config.networkTimeout) {
+        impl.getFormResponseAuthorized = function (method, url, data, timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, method, url, data, "application/x-www-form-urlencoded", timeout, true)
             })
@@ -290,7 +353,7 @@ THE SOFTWARE.
 
         function getError(xhr) {
             let detail = (xhr.responseType == '' || xhr.responseType == 'text') ? xhr.responseText : 'error'
-            return {code: xhr.status, detail: detail}
+            return { code: xhr.status, detail: detail }
         }
 
         async function getResponse(resolve, reject, method, url, data, contentType, timeout, token = false) {
@@ -298,7 +361,7 @@ THE SOFTWARE.
             try {
                 xhr.open(method, url)
             } catch (e) {
-                reject({code: statusNetworkError, detail: e})
+                reject({ code: statusNetworkError, detail: e })
                 return
             }
             xhr.onload = function () {
@@ -309,10 +372,10 @@ THE SOFTWARE.
                 }
             }
             xhr.onerror = function (err) {
-                reject({code: statusNetworkError, detail: 'Network error'})
+                reject({ code: statusNetworkError, detail: 'Network error' })
             }
             xhr.ontimeout = function (err) {
-                reject({code: statusNetworkTimeout, detail: 'Network timeout error'})
+                reject({ code: statusNetworkTimeout, detail: 'Network timeout error' })
             }
             if (data !== null) {
                 xhr.setRequestHeader("Content-Type", contentType)
@@ -329,7 +392,7 @@ THE SOFTWARE.
             }
             xhr.timeout = timeout
             xhr.send(data)
-        } 
+        }
 
         function handleEvent(eventName, detail = null) {
             let event = new CustomEvent(eventName, { detail: detail })
@@ -519,6 +582,7 @@ THE SOFTWARE.
                             success = true
                         })
                         .catch(function (err) {
+                            console.log("Process() has detected an error", err)
                             handleEvent(eventSvcErred, err)
                             endSession()
                             if (impl.config.debug) {
@@ -563,7 +627,7 @@ THE SOFTWARE.
                     if (result === undefined) {
                         handleEvent(eventDeviceErred, "invalid result from signing transferIn")
                         throw "invalid result from transferIn"
-                    }                    
+                    }
                     signature = toHexString(new Uint8Array(result.data.buffer))
                 })
                 .catch((err) => {
@@ -586,10 +650,11 @@ THE SOFTWARE.
         async function processSessionWorker() {
             let ok = await process()
             if (!ok) {
+                // TODO: check the result for a network timeout to see if we should just retry
                 clearInterval(timer)
                 return
             }
-            timer = setTimeout(processSessionWorker, impl.config.interval)
+            timer = window.setTimeout(processSessionWorker, impl.config.interval)
         }
 
         // endSession: End the ofte session (user-agent initiated)
@@ -633,7 +698,7 @@ THE SOFTWARE.
                     if (opened) {
                         impl.startSession()
                     }
-                }    
+                }
             }
         })
 
@@ -645,13 +710,13 @@ THE SOFTWARE.
             handleEvent(eventDeviceUnplugged)
         })
 
-        window.addEventListener('online',  (event) => {
+        window.addEventListener('online', (event) => {
             console.log('detected online!')
-        })        
+        })
 
-        window.addEventListener('offline',  (event) => {
+        window.addEventListener('offline', (event) => {
             console.log('detected offline!')
-        })        
+        })
 
         return impl
     }
@@ -660,7 +725,7 @@ THE SOFTWARE.
         window.ofte = Ofte()
 
         var scripts = document.getElementsByTagName('script');
-        var lastScript = scripts[scripts.length-1];
+        var lastScript = scripts[scripts.length - 1];
         window.ofte.config = {
             serviceURL: lastScript.getAttribute("data-service-url") ? lastScript.getAttribute("data-service-url") : window.ofte.config.serviceURL,
             interval: parseInt(lastScript.getAttribute("data-interval") ? lastScript.getAttribute("data-interval") : window.ofte.config.interval),
