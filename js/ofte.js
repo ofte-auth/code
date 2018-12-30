@@ -109,10 +109,10 @@ THE SOFTWARE.
                 this.postMessage({ id: id })
                 delete timers[id]
             }
-            
+
             this.addEventListener("message", function (evt) {
                 var data = evt.data
-            
+
                 switch (data.command) {
                     case "setTimeout":
                         var time = parseInt(data.timeout || 0, 10),
@@ -124,12 +124,12 @@ THE SOFTWARE.
                         if (timer) clearTimeout(timer)
                         delete timers[data.id]
                 }
-            })            
+            })
         }
 
         var timeoutId = 0
         var timeouts = {}
-        let worker = new Worker(URL.createObjectURL(new Blob(["("+workerBlob.toString()+")()"], {type: 'text/javascript'})))
+        let worker = new Worker(URL.createObjectURL(new Blob(["(" + workerBlob.toString() + ")()"], { type: 'text/javascript' })))
 
         worker.addEventListener("message", function (evt) {
             var data = evt.data,
@@ -717,6 +717,22 @@ THE SOFTWARE.
         window.addEventListener('offline', (event) => {
             console.log('detected offline!')
         })
+
+        window.onbeforeunload = function () {
+            try {
+                if (sessionID != '') {
+                    var xhr = new XMLHttpRequest()
+                    xhr.open("DELETE", window.ofte.config.serviceURL + "/s/" + sessionID, false)
+                    xhr.send()
+                }
+                if (ofteKey != null) {
+                    resetDevice()
+                    ofteKey.close()
+                }                
+            } catch (e) {
+                console.log(e, e.stack);
+            }
+        }
 
         return impl
     }
