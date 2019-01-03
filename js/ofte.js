@@ -390,6 +390,7 @@ THE SOFTWARE.
                     xhr.setRequestHeader(tokenHeader, t)
                 }
             }
+            xhr.setRequestHeader("Access-Control-Max-Age", 600)
             xhr.timeout = timeout
             xhr.send(data)
         }
