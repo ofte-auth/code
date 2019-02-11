@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <meta name="google-signin-client_id" content="964837469726-7jkq59vk4sduo9f6hutt3vdk36ch9n9m.apps.googleusercontent.com">
+    <title>Ofte Portal Demo</title>
+    <link href='https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons' rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.min.css" rel="stylesheet">
+    <link href="./css/site.css" rel="stylesheet">
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+
+        /* prevent router link from underlining */
+        li a {
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+
+<body>
+
+    <div id="app">
+        <v-app id="portal">
+            <v-toolbar app>
+                <v-toolbar-title>Ofte Portal Demo</v-toolbar-title>
+            </v-toolbar>
+            <v-content>
+                <v-container fluid>
+                    <router-view></router-view>
+                </v-container>
+            </v-content>
+        </v-app>
+    </div>
+
+
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.18/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.js"></script>
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <script src="https://apis.google.com/js/api:client.js"></script>
+
+    <script>
+        var masterStore = {
+            googleIDToken:      '',
+            //portalAPIEndpoint:  '[[ .portalAPIEndpoint ]]',
+            portalAPIEndpoint:  '/login',
+            authAPIEndpoint:    '[[ .authAPIEndpoint ]]'
+        }
+    </script>
+
+    <script src="https://cdn.ofte.io/js/latest/ofte.js" 
+        data-interval="1750" 
+        data-service-url="https://portal.ofte.io:65443/v1"
+        data-auto-start="false"></script>
+    <script src='./lib/googleoauth.js'></script>
+
+    <script src='./pages/home.vue.js'></script>
+    <script src='./pages/login.vue.js'></script>
+    <script src='./pages/error.vue.js'></script>
+    <script src='./pages/components/confirmdialog.vue.js'></script>
+
+    <script>
+
+        Vue.use(VueRouter)
+
+        const routes = [{
+            path: '/',
+            component: portalHome,
+            meta: { auth: true }
+        },
+        {
+            path: '/login',
+            component: portalLogin
+        },
+        {
+            path: '/error',
+            name: 'error',
+            component: portalError,
+            props: true
+        }
+        ]
+
+        let router = new VueRouter({
+            routes
+        })
+        router.beforeEach((to, from, next) => {
+            const authRequired = to.matched.some((route) => route.meta.auth)
+            if (authRequired && masterStore.googleIDToken === '') {
+                next('/login')
+            } else {
+                next()
+            }
+        })
+
+        var app = new Vue({
+            el: '#app',
+            data: masterStore,
+            router
+        })
+
+        ofte.on(ofte.eventDeviceUnplugged, function() {
+            masterStore.googleIDToken = ''
+            router.push('/login')
+        })
+        ofte.on(ofte.eventSvcErred, function() {
+            masterStore.googleIDToken = ''
+            router.push('/login')
+        })
+
+    </script>
+
+</body>
+
+</html>
