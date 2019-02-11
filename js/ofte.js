@@ -81,6 +81,10 @@ THE SOFTWARE.
         // timer is the interval handle for the processing phase
         var timer
 
+        // state maintains the state of the Ofte key and service
+        var state
+        resetState()
+
         var events = {}
         events[eventDeviceDiscovered] = { desc: 'The ofte device was discovered', callbacks: new Array() }
         events[eventDeviceNotFound] = { desc: 'No ofte device was found', callbacks: new Array() }
@@ -141,6 +145,7 @@ THE SOFTWARE.
             delete timeouts[id]
         });
 
+        // override the native setTimeout function
         window.setTimeout = function (fn, delay) {
             var args = Array.prototype.slice.call(arguments, 2)
             timeoutId += 1
@@ -151,6 +156,7 @@ THE SOFTWARE.
             return id
         };
 
+        // override the native clearTimeout function
         window.clearTimeout = function (id) {
             worker.postMessage({ command: "clearTimeout", id: id })
             delete timeouts[id]
@@ -178,10 +184,23 @@ THE SOFTWARE.
             events[eventName].callbacks.push(func)
         }
 
+        // off: clear a func from the event queue
+        impl.off = function (eventName, func) {
+            if (!verifyEventName(eventName)) {
+                throw 'invalid event name ' + eventName
+            }
+            let callbacks = events[eventName].callbacks
+            for (var i = 0; i < callbacks.length; ++i) {
+                if (callbacks[i] === func) {
+                    events[eventName].callbacks.splice(i, 1)
+                }
+            }
+        }
+
         // pairDevice: Pair a device; this must come from a user-initiated event
         impl.pairDevice = async function () {
             if (ofteKey !== null) {
-                await closeDevice()
+                await resetAndCloseDevice()
             }
             if (impl.config.debug) {
                 console.log("ofte: pairing device")
@@ -213,17 +232,18 @@ THE SOFTWARE.
             if (success == true && impl.config.autoStart) {
                 impl.startSession()
             }
+            state.detected = state.opened = success
             return success
         }
 
         // openDevice: Opens (open,selectConfig,claimInterface) the device
         impl.openDevice = async function () {
             let success = true
-            if (ofteKey == null) {
+            if (ofteKey === null) {
                 throw 'ofte: device not connected'
             }
             if (ofteKey.opened) {
-                ofteKey.close()
+                resetAndCloseDevice()
             }
             await ofteKey.open()
                 .catch((err) => {
@@ -264,16 +284,20 @@ THE SOFTWARE.
                     ofteKey = null
                     handleEvent(eventDeviceErred, err)
                 })
+            state.detected = state.opened = success
             return success
         }
 
         // startSession: Begin the ofte initialize and process rounds
         impl.startSession = async function () {
-            if (ofteKey == null) {
+            if (ofteKey === null) {
                 throw 'ofte device not opened'
             }
             let ok = await initialize()
             if (!ok) {
+                if (impl.config.debug) {
+                    console.log("ofte: error on initialize()")
+                }
                 return
             }
             if (impl.config.debug) {
@@ -281,6 +305,9 @@ THE SOFTWARE.
             }
             ok = await process()
             if (!ok) {
+                if (impl.config.debug) {
+                    console.log("ofte: error on first process()")
+                }
                 return
             }
             processSessionWorker()
@@ -291,8 +318,8 @@ THE SOFTWARE.
             await endSession()
         }
 
-        // reset: ends the session and then restarts if autoStart is true
-        impl.reset = async function () {
+        // resetSession: ends the session and then restarts if autoStart is true
+        impl.resetSession = async function () {
             await endSession()
             let found = await discoverDevices()
             if (found && impl.config.autoStart) {
@@ -301,6 +328,11 @@ THE SOFTWARE.
                     impl.startSession()
                 }
             }
+        }
+
+        // state returns (a copy of) the Ofte state object
+        impl.state = async function () {
+            return(JSON.parse(JSON.stringify(state)))
         }
 
         // Ofte-protected data retrieval functions
@@ -418,6 +450,7 @@ THE SOFTWARE.
             if (impl.config.debug) {
                 console.log('ofte: devices', devices)
             }
+            // the Ofte device will only be in the list if already paired at some point
             devices.forEach(async device => {
                 if (device.vendorId == vendorId) {
                     ofteKey = device
@@ -435,14 +468,17 @@ THE SOFTWARE.
             if (!success) {
                 handleEvent(eventDeviceNotFound)
             }
+            state.detected = success
             return success
         }
 
-        // closeDevice: Close the device
-        async function closeDevice() {
+        // resetAndCloseDevice: reset and close the device
+        async function resetAndCloseDevice() {
             if (ofteKey !== null) {
                 await resetDevice()
                 await ofteKey.close()
+                ofteKey = null
+                resetState()
                 handleEvent(eventDeviceClosed)
             }
         }
@@ -470,6 +506,9 @@ THE SOFTWARE.
                     .then(() => {
                         success = true
                         handleEvent(eventDeviceReset)
+                        if (impl.config.debug) {
+                            console.log("ofte: device reset")
+                        }
                     })
                     .catch((err) => {
                         if (impl.config.debug) {
@@ -477,7 +516,6 @@ THE SOFTWARE.
                         }
                     })
             }
-            console.log(">>>> RESET DEVICE STATE:", success)
             return success
         }
 
@@ -537,6 +575,7 @@ THE SOFTWARE.
                         console.log("ofte: error initializing device", err)
                     }
                 })
+            state.initialized = success
             return success
         }
 
@@ -582,7 +621,6 @@ THE SOFTWARE.
                             success = true
                         })
                         .catch(function (err) {
-                            console.log("Process() has detected an error", err)
                             handleEvent(eventSvcErred, err)
                             endSession()
                             if (impl.config.debug) {
@@ -596,6 +634,7 @@ THE SOFTWARE.
                         console.log("ofte: error processing to server", err)
                     }
                 })
+            state.processing = success
             return success
         }
 
@@ -645,23 +684,33 @@ THE SOFTWARE.
             }).join('')
         }
 
+        function resetState() {
+            state = {
+                detected: false,
+                opened: false,
+                initialized: false,
+                processing: false
+            }
+        }
 
         // processSessionWorker: Handler for session processing rounds
         async function processSessionWorker() {
             let ok = await process()
             if (!ok) {
-                // TODO: check the result for a network timeout to see if we should just retry
-                clearInterval(timer)
+                window.clearTimeout(timer)
                 return
             }
             timer = window.setTimeout(processSessionWorker, impl.config.interval)
         }
 
-        // endSession: End the ofte session (user-agent initiated)
+        // endSession: Reset the key and end the ofte session (user-agent initiated)
         async function endSession() {
-            clearInterval(timer)
-            await closeDevice()
+            window.clearTimeout(timer)
+            await resetDevice()
             buffer = new ArrayBuffer(16)
+            if (sessionID === '') {
+                return
+            }
             await impl.getDataResponse("DELETE", impl.config.serviceURL + "/p/" + sessionID)
                 .then(function (resp) {
                     if (impl.config.debug) {
@@ -693,6 +742,8 @@ THE SOFTWARE.
             if (event.device.vendorId === vendorId) {
                 ofteKey = event.device
                 handleEvent(eventDevicePlugged, event.device)
+                handleEvent(eventDeviceDiscovered, event.device)
+                state.detected = true
                 if (impl.config.autoStart) {
                     let opened = await impl.openDevice()
                     if (opened) {
@@ -703,11 +754,22 @@ THE SOFTWARE.
         })
 
         navigator.usb.addEventListener('disconnect', (event) => {
+            if (event.device !== ofteKey) {
+                return
+            }
+            //clearInterval(timer)
+            window.clearTimeout(timer)
+            ofteKey = null
+            if (sessionID != '') {
+                var xhr = new XMLHttpRequest()
+                xhr.open("DELETE", window.ofte.config.serviceURL + "/s/" + sessionID, false)
+                xhr.send()
+            }
+            resetState()
+            handleEvent(eventDeviceUnplugged)
             if (impl.config.debug) {
                 console.log("ofte: device unplugged")
             }
-            ofteKey = null
-            handleEvent(eventDeviceUnplugged)
         })
 
         window.addEventListener('online', (event) => {
@@ -725,10 +787,7 @@ THE SOFTWARE.
                     xhr.open("DELETE", window.ofte.config.serviceURL + "/s/" + sessionID, false)
                     xhr.send()
                 }
-                if (ofteKey != null) {
-                    resetDevice()
-                    ofteKey.close()
-                }                
+                resetAndCloseDevice()
             } catch (e) {
                 console.log(e, e.stack);
             }
@@ -776,6 +835,7 @@ THE SOFTWARE.
         window.ofte.eventSvcKilled = eventSvcKilled
         window.ofte.eventSvcErred = eventSvcErred
         window.ofte.eventNetworkErred = eventNetworkErred
+
     }
 
 })(window)
