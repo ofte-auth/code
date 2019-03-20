@@ -17,11 +17,8 @@ Integrating Ofte into your web application involves two simple steps
 
 Ofte uses a Javascript library named `ofte.js` to initialize and communicate with your OfteKeys and our services. You can find the latest ofte.js at our CDN at this url:
 
-```https://glcdn.githack.com/ofte/code/raw/master/js/ofte.js```
+```https://cdn.ofte.io/js/latest/ofte.js```
 
-You can find specific sematically versioned releases similarly:
-
-```https://glcdn.githack.com/ofte/code/raw/1.0.0/js/ofte.js```
 
 You can load and initialize the Ofte Javascript Library via a normal `<script>` reference.
 
@@ -46,7 +43,7 @@ var config = {
 You can specify these parameters when loading the script by adding `data-<name>` attributes to the `script` tag. For instance, to set the `interval` to 2.5 seconds, you'd issue use this directive:
 
 ```javascript
-<script src="https://cdn.ofte.io/js/latest/ofte.js" data-interval="2500"></script>
+<script src="https://cdn.ofte.io/js/latest/ofte.js" data-interval="1250"></script>
 ```
 
 Here are the <i>data attribute</i> tags and corresponding config attributes:
