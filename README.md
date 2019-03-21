@@ -23,7 +23,7 @@ Ofte uses a Javascript library named `ofte.js` to initialize and communicate wit
 You can load and initialize the Ofte Javascript Library via a normal `<script>` reference.
 
 ```javascript
-<script src="https://glcdn.githack.com/ofte/code/raw/master/js/ofte.js"></script>
+<script src="https://cdn.ofte.io/js/latest/ofte.js"></script>
 ```
 
 #### Configuration
