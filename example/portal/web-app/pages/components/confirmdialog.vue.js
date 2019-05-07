@@ -2,7 +2,7 @@ Vue.component("confirm-dialog", {
     template: `
     <v-dialog v-model="dialog" :max-width="options.width" @keydown.esc="cancel" v-bind:style="{ zIndex: options.zIndex }">
       <v-card>
-        <v-toolbar :color="options.color" dense flat>
+        <v-toolbar dark :color="options.color" dense flat>
           <v-toolbar-title class="white--text">{{ title }}</v-toolbar-title>
         </v-toolbar>
         <v-card-text v-show="!!message">{{ message }}</v-card-text>

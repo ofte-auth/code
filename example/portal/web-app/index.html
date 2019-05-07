@@ -7,7 +7,7 @@
     <meta name="google-signin-client_id" content="964837469726-7jkq59vk4sduo9f6hutt3vdk36ch9n9m.apps.googleusercontent.com">
     <title>Ofte Portal Demo</title>
     <link href='https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons' rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@1.5.14/dist/vuetify.min.css" rel="stylesheet">
     <link href="./css/site.css" rel="stylesheet">
     <style>
         [v-cloak] {
@@ -39,9 +39,10 @@
 
 
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.18/dist/vue.js"></script>
+    <!--script src="https://cdn.jsdelivr.net/npm/vue@2.5.18/dist/vue.js"></script-->
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@1.5.14/dist/vuetify.js"></script>
     <script src="https://apis.google.com/js/platform.js" async defer></script>
     <script src="https://apis.google.com/js/api:client.js"></script>
 
@@ -68,6 +69,7 @@
     <script>
 
         Vue.use(VueRouter)
+        Vue.use(Vuetify)
 
         const routes = [{
             path: '/',

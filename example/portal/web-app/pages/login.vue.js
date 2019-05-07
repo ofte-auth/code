@@ -1,7 +1,7 @@
 var portalLogin = Vue.component("Login", {
     template: `<v-dialog v-model="dialog" persistent max-width="500px">
     <v-card class="elevation-12">
-        <v-toolbar color="primary">
+        <v-toolbar dark color="primary">
             <v-toolbar-title>Ofte Portal Login</v-toolbar-title>
             <v-spacer></v-spacer>
         </v-toolbar>
