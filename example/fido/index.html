@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Ofte - FIDO2 CA Demo</title>
+  <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900'>
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css'>
+  <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Material+Icons'>
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/vuetify@2.2.8/dist/vuetify.min.css'>
+  <link rel='stylesheet' href='styles.css'>
+
+</head>
+
+<body>
+  <div id="app">
+    <v-app id="demo" v-cloak>
+      <v-content>
+        <v-container fluid>
+          <v-row class="mb-6">
+            <v-col>
+            </v-col>
+            <v-col cols="12" md="8" lg="6">
+              <div class="display-1">
+                Ofte FIDO2 CA Demo
+              </div>
+              <v-stepper v-model="flowStep" vertical>
+
+                <!-- Collect Authentication -->
+                <v-stepper-step :complete="flowStep > 1" step="1">
+                  Authenticate with a first factor
+                  <small>Add a username to use for authentication.</small>
+                </v-stepper-step>
+                <v-stepper-content v-model="step1Valid" step="1">
+                  <v-card color="light-green lighten-5 pa-4" class="mb-12 body-1">
+                    <v-container>
+                      <v-row>
+                        <v-col>
+                          <v-form v-model="step1Valid">
+                            <v-container>
+                              <v-row>
+                                <v-col cols="12" sm="12" md="6">
+                                  <v-text-field label="Username" v-model="username" :rules="[rules.required]"
+                                    hint="For example, john@example.com"></v-text-field>
+                                </v-col>
+                              </v-row>
+                              <v-row>
+                                <v-col cols="12" sm="12" md="6">
+                                  <v-text-field label="Display Name" v-model="displayName" :rules="[rules.required]"
+                                    hint="For example, John Smith"></v-text-field>
+                                </v-col>
+                              </v-row>
+                              <v-row>
+                                <v-col cols="12" sm="12" md="6">
+                                  <v-text-field label="Profile picture" v-model="icon"
+                                    hint="For example, http://foo.com/pic.jpg"></v-text-field>
+                                </v-col>
+                              </v-row>
+                            </v-container>
+                          </v-form>
+                        </v-col>
+                        <v-col>
+                          <p>
+                            Ofte works with any identity system. You provide the <strong>first factor</strong> which is
+                            typically some form of credential like a username/password or OAUTH result attributes.
+                          </p>
+                          <p>
+                            <strong>Ofte provides the second factor</strong>-our hardware based authenticators.
+                          </p>
+                          <p>
+                            For the purposes of the demo, enter a username, displayname and optional icon URL. Typically
+                            this information would come from your IDM or OIDC provider. Note that the Ofte platform does
+                            not store any sensitive information like passwords or private keys.
+                          </p>
+                        </v-col>
+                      </v-row>
+                    </v-container>
+                  </v-card>
+                  <v-btn color="primary" @click="flowStep = 2" :disabled="!step1Valid">Continue</v-btn>
+                  <v-btn text>Cancel</v-btn>
+                </v-stepper-content>
+
+                <!-- Register -->
+                <v-stepper-step :complete="flowStep > 2" step="2">
+                  Register an Authenticator
+                  <small>Plug in your Ofte Key.</small> 
+                </v-stepper-step>
+                <v-stepper-content step="2">
+                  <v-card color="light-green lighten-5 pa-4" class="mb-12 body-1">
+                    <p id="step2notfound" v-show="!hasAuthenticator">
+                      An Ofte authenticator was not found. We've kicked off the "Register flow"...
+                    </p>
+                    <p id="step2found" v-show="hasAuthenticator">
+                      An authenticator was found. Click continue to Login via FIDO2, or register another authenticator.
+                    </p>
+                  </v-card>
+                  <v-btn color="primary" v-show="!hasAuthenticator" @click="flowStep = 3">Continue</v-btn>
+                  <v-btn color="primary" v-show="hasAuthenticator" @click="flowStep = 4">Continue</v-btn>
+                  <v-btn color="primary" v-show="hasAuthenticator" @click="registerNewAuthenticator(this.username)">Register another</v-btn>
+                  <v-btn text>Cancel</v-btn>
+                </v-stepper-content>
+
+                <!-- Register Ofte -->
+                <v-stepper-step :complete="flowStep > 3" step="3">
+                  Register an Ofte Authenticator
+                  <small>An additional step for Ofte Keys—this step binds the key to the username.</small>
+                </v-stepper-step>
+                <v-stepper-content step="3">
+                  <v-card color="light-green lighten-5 pa-4" class="mb-12 body-1">
+                    <p>
+                      Because this is an Ofte Key, an additional Authenticator "Presence Test" is
+                      required.
+                    </p>
+                  </v-card>
+                  <v-btn text>Cancel</v-btn>
+                </v-stepper-content>
+
+                <!-- Login -->
+                <v-stepper-step :complete="flowStep > 4" step="4">
+                  Login using your Authenticator
+                  <small>This step is only needed when logging in.</small>
+                </v-stepper-step>
+                <v-stepper-content step="4">
+                  <v-btn color="primary" @click="flowStep = 4">Continue</v-btn>
+                  <v-btn text>Cancel</v-btn>
+                </v-stepper-content>
+
+                <!-- Observe Ofte Continuous Authentication -->
+                <v-stepper-step :complete="flowStep > 5" step="5">
+                  Ofte Continuous Authentication
+                  <small>A CA session is now active.</small>
+                </v-stepper-step>
+                <v-stepper-content step="5">
+                  <v-btn color="primary" @click="accessRequest()">Request URI</v-btn>
+                  <v-btn color="primary" @click="endSession()">End CA Session</v-btn>
+                  <v-container style="max-width: 600px;">
+                    <v-timeline dense clipped>
+                      <v-slide-x-transition group>
+                        <v-timeline-item v-for="event in timeline" :key="event.id" class="mb-4" color="green" small>
+                          <v-row justify="space-between">
+                            <v-col cols="7" v-text="event.text"></v-col>
+                            <v-col class="text-right" cols="5" v-text="event.time"></v-col>
+                          </v-row>
+                        </v-timeline-item>
+                      </v-slide-x-transition>
+                    </v-timeline>
+                  </v-container>
+                </v-stepper-content>
+
+                <!-- Not an Ofte key -->
+                <v-stepper-step :complete="flowStep > 6" step="6" v-show="sessionID == ''">
+                  Operate outside of Ofte CA
+                </v-stepper-step>
+                <v-stepper-content step="6">
+                  <p>The autheticator is not an Ofte key, no Continuous Authentication is active.</p>
+                  <v-btn @click="flowStep = 1" text>Restart</v-btn>
+                </v-stepper-content>
+
+              </v-stepper>
+
+              <v-row justify="center">
+                <v-dialog v-model="displayPressAuth" persistent max-width="320">
+                  <v-card>
+                    <v-img class="black--text align-end" height="240px" src="./touch.png">
+                    </v-img>
+                    <v-card-title>Press Your Authenticator Key</v-card-title>
+                    <v-card-text>Because this is an Ofte Authenticator, please allow us to access it again.
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-spacer></v-spacer>
+                      <v-btn color="black darken-1" text @click="displayPressAuth = false">Cancel</v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </v-dialog>
+              </v-row>
+
+            </v-col>
+            <v-col></v-col>
+          </v-row>
+
+        </v-container>
+      </v-content>
+    </v-app>
+  </div>
+
+  <script src='https://cdn.jsdelivr.net/npm/babel-polyfill/dist/polyfill.min.js'></script>
+  <script src='https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js'></script>
+  <script src='https://cdn.jsdelivr.net/npm/vuetify@2.2.8/dist/vuetify.min.js'></script>
+  <!--script type="text/javascript" src="./u2f-api.js"></!--script-->
+  <!--script src="./lib.js"></!--script-->
+  <script src="./ofte.js" 
+    data-service-host="https://localhost:2357"
+    data-debug="true">
+  </script>
+
+  <script>
+    new Vue({
+      el: '#app',
+      vuetify: new Vuetify(),
+      data() {
+        return {
+          flowStep: 1,
+          username: 'foo@bar.com',
+          displayName: 'Foo Bar',
+          icon: '',
+          hasAuthenticator: false,
+          displayPressAuth: false,
+          sessionID: '',
+          events: [],
+          input: null,
+          timelineCounter: 0,
+          rules: {
+            required: value => !!value || 'Required.'
+          },
+          step1Valid: false,
+          principal: null,
+        };
+      },
+      watch: {
+        flowStep: async function () {
+          switch (this.flowStep) {
+            case 2:
+              this.sessionID = ''
+              await ofte.getOrCreatePrincipal(
+                {
+                  "username": this.username,
+                  "displayName": this.displayName,
+                  "icon": this.icon
+                })
+                .then(async resp => {
+                  this.principal = resp;
+                  this.hasAuthenticator = this.principal.authenticators !== null && this.principal.authenticators.length > 0;
+                  if (!this.hasAuthenticator) {
+                    this.registerNewAuthenticator(this.username)
+                  }
+                })
+                .catch(err => {
+                  console.log('error processing getorcreateprincipal', err)
+                });
+              break;
+            case 3:
+              this.displayPressAuth = true
+              ofte.registerOfteKey(this.username);
+              break;
+            case 4:
+              ofte.loginFIDOKey(this.username)
+                .then(result => {
+                  this.sessionID = result.value
+                  this.flowStep = 5
+                })
+                .catch(error => {
+                  console.log(error)
+                })
+              break;
+            case 5:
+              if (this.sessionID === '') {
+                this.flowStep = 6
+              }
+              break;
+          }
+        },
+      },
+      methods: {
+        async registerNewAuthenticator(uname) {
+          await ofte.registerFIDOKey(this.username)
+                      .then((a11r) => {
+                        console.log("Here's the a11r", a11r)
+                        if (a11r.label == "Ofte Key") {
+                          this.flowStep = 3
+                        } else {
+                          this.flowStep = 4
+                        }
+                      })
+                      .catch(error => {
+                        console.log("error", error)
+                        return
+                      })          
+        },
+        addTimelineEvent(event) {
+          const time = new Date().toISOString().substr(11, 8) + " GMT"
+          this.events.push({
+            id: this.timelineCounter++,
+            text: event.text,
+            time: new Date().toISOString().substr(11, 8) + " GMT",
+          })
+        },
+        async accessRequest() {
+          console.log('access request');
+          await ofte.fetch("GET", "https://localhost:2357/test_resource_endpoint/123")
+          .then((resp) => {
+            this.addTimelineEvent({text: "Access URI\n"+resp});
+          })
+          .catch((err) => {
+            console.log('error', err)
+          })
+        },
+        async endSession() {
+          await ofte.endSession()
+          .then(() => {
+            console.log('session ended')
+            this.flowStep = 1
+          })
+          .catch((err) => {
+            console.log('error ending session')
+          })
+        }
+      },
+      computed: {
+        timeline() {
+          return this.events.slice().reverse()
+        },
+      },
+      mounted() {
+        _this = this
+        document.addEventListener('ofte-key-registered', function (event) {
+          console.log('ofte-key-registered!', event);
+          _this.displayPressAuth = false;
+          _this.flowStep = 4
+        });
+        document.addEventListener('ofte-session-start', function (event) {
+          _this.addTimelineEvent({ text: "CA session initiated" })
+        }),
+        document.addEventListener('ofte-key-assert', function (event) {
+          _this.addTimelineEvent({ text: "CA session (" + _this.sessionID + ") revived" })
+        });
+      },
+    });
+  </script>
+
+</body>
