@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <!-- version -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <title>Ofte Administration</title>
+    <link href='https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons' rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@1.5.14/dist/vuetify.min.css" rel="stylesheet">
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+
+        /* prevent router link from underlining */
+        li a {
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+
+<body>
+
+    <div id="app" v-cloak>
+        <v-app id="inspire">
+            <v-navigation-drawer fixed v-model="drawer" app>
+                <v-list dense>
+                    <router-link to="/" style="text-decoration: none; color: inherit">
+                        <v-list-tile @click="">
+                            <v-list-tile-action>
+                                <v-icon>home</v-icon>
+                            </v-list-tile-action>
+                            <v-list-tile-content>
+                                <v-list-tile-title>Dashboard</v-list-tile-title>
+                            </v-list-tile-content>
+                        </v-list-tile>
+                    </router-link>
+                    <router-link to="/users" style="text-decoration: none; color: inherit">
+                        <v-list-tile @click="">
+                            <v-list-tile-action>
+                                <v-icon>perm_identity</v-icon>
+                            </v-list-tile-action>
+                            <v-list-tile-content>
+                                <v-list-tile-title>Users</v-list-tile-title>
+                            </v-list-tile-content>
+                        </v-list-tile>
+                    </router-link>
+                    <router-link to="/keys" style="text-decoration: none; color: inherit">
+                        <v-list-tile @click="">
+                            <v-list-tile-action>
+                                <v-icon>vpn_key</v-icon>
+                            </v-list-tile-action>
+                            <v-list-tile-content>
+                                <v-list-tile-title>Keys</v-list-tile-title>
+                            </v-list-tile-content>
+                        </v-list-tile>
+                    </router-link>
+                </v-list>
+            </v-navigation-drawer>
+            <v-toolbar color="indigo" dark fixed app>
+                <v-toolbar-side-icon @click.stop="drawer = !drawer"></v-toolbar-side-icon>
+                <v-toolbar-title>Ofte Administration : {{msg}}</v-toolbar-title>
+            </v-toolbar>
+            <v-content>
+                <v-container fluid>
+                    <router-view></router-view>
+                </v-container>
+            </v-content>
+        </v-app>
+    </div>
+
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.20.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.18/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@1.5.14/dist/vuetify.js"></script>
+
+    <script src='./pages/home.vue.js'></script>
+    <script src='./pages/login.vue.js'></script>
+    <script src='./pages/keys.vue.js'></script>
+    <script src='./pages/users.vue.js'></script>
+    <script src='./pages/components/keylist.vue.js'></script>
+    <script src='./pages/components/userlist.vue.js'></script>
+    <script src='./pages/components/confirmdialog.vue.js'></script>
+    <script src='./pages/components/sessionlist.vue.js'></script>
+    <script src='./pages/components/auditlist.vue.js'></script>
+    <script src='./pages/components/sessionmap.vue.js'></script>
+
+    <script src="./lib/vue-google-maps.js"></script>
+    <script src="./lib/env.js"></script>
+
+    <script>
+        Vue.use(VueRouter)
+        Vue.use(VueGoogleMaps, {
+            // Please use your own Google Maps API key ;)
+            load: {
+                key: 'AIzaSyCmjxYcPpSGTs9-OPXSr_cOeiZLmx5OJ_U'
+            }
+        });
+
+
+        const routes = [{
+            path: '/',
+            component: adminHome
+        },
+        {
+            path: '/login',
+            component: adminLogin
+        },
+        {
+            path: '/keys',
+            component: adminKeys
+        },
+        {
+            path: '/users',
+            component: adminUsers
+        }
+        ]
+
+        let router = new VueRouter({
+            //mode: 'history',
+            routes // short for `routes: routes`
+        })
+        router.beforeEach((to, from, next) => {
+            next()
+        })
+
+        Vue.component('google-map', VueGoogleMaps.Map)
+        Vue.component('google-marker', VueGoogleMaps.Marker)
+
+        // Add global component read-only accessors
+        Vue.mixin({
+            data: function () {
+                return {
+                    get adminAPIEndpoint() {
+                        return getEnvironmentVariable('OFTE_ADMIN_ENDPOINT')
+                    }
+                }
+            }
+        })
+
+        var app = new Vue({
+            el: '#app',
+            watch: {},
+            mounted() {
+            },
+            data: {
+                msg: '',
+                drawer: null
+            },
+            methods: {},
+            router
+        })
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,33 @@
+ServiceName = "admin"
+
+SymmetricKeyFile = "/srv/certs/ofte_256bit_symmetric.key"
+GeoIPDBFile = "/srv/deploy/GeoLite2-City.mmdb"
+
+[Server]
+ListenAddr = ":8099"
+ServiceMode = "debug"
+Port = "65444"
+CertFile = "/srv/certs/fullchain.pem"
+KeyFile = "/srv/certs/privkey.pem"
+StaticFilesLocation = "/srv/web-app"
+
+[Server.CrossOrigin]
+AllowAllOrigins = true
+#AllowOrigins = ["https://foo.com:3000"]
+AllowMethods = ["GET", "POST", "PUT", "HEAD", "DELETE"]
+AllowHeaders = ["Origin", "Content-Length", "Content-Type"]
+AllowCredentials = true
+MaxAge = "12h"
+
+[Database]
+Database = "ofte"
+Host = "postgresql"
+Port = 5432
+User = "postgres"
+Password = "devpassword"
+SSLMode = "disable"
+MaxConnections = 100
+MaxIdleConnections = 50
+
+[Store]
+Endpoints = ["http://etcd:2379"]

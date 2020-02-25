@@ -229,7 +229,7 @@
                 })
                 .then(async resp => {
                   this.principal = resp;
-                  this.hasAuthenticator = this.principal.authenticators !== null && this.principal.authenticators.length > 0;
+                  this.hasAuthenticator = this.principal.fidoKeys !== null && this.principal.fidoKeys.length > 0;
                   if (!this.hasAuthenticator) {
                     this.registerNewAuthenticator(this.username)
                   }
@@ -263,9 +263,9 @@
       methods: {
         async registerNewAuthenticator(uname) {
           await ofte.registerFIDOKey(this.username)
-                      .then((a11r) => {
-                        console.log("Here's the a11r", a11r)
-                        if (a11r.label == "Ofte Key") {
+                      .then((key) => {
+                        console.log("Here's the key", key)
+                        if (key.certLabel == "Ofte Key") {
                           this.flowStep = 3
                         } else {
                           this.flowStep = 4
