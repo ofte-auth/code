@@ -78,7 +78,7 @@ Vue.component("session-list", {
         let pagination = this.pagination
         this.timer = setInterval(function () {
             pagination.hitCount++
-        }, 3000)
+        }, 30000)
     },
     destroyed() {
         clearInterval(this.timer)

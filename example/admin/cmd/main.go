@@ -49,6 +49,7 @@ func setupWebServer() (*gin.Engine, error) {
 	return router, nil
 }
 
+// handleJSEnv is called by the admin vue app to retrieve environment variables.
 func handleJSEnv(ctx *gin.Context) {
 	value := fmt.Sprintf(jsTemplate, envMap["OFTE_ADMIN_ENDPOINT"])
 	ctx.Writer.WriteString(value)
