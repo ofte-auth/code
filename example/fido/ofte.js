@@ -31,7 +31,7 @@ THE SOFTWARE.
 
         var impl = {}
         impl.config = {
-            serviceHost: 'https://localhost:2357',// the URL of the Ofte Auth Service (we'll supply this to you)
+            authServiceURL: 'https://localhost:2357',   // the URL of your Ofte Auth Service instance, defaults to localhost for testing
             interval: 20000,                            // the interval, in milliseconds, of continuous authentication
             networkTimeout: 10000,                      // the timeout, in millseconds, for network requests
             debug: true                                 // if true, send debugging output to the console
@@ -70,71 +70,110 @@ THE SOFTWARE.
         */
         impl.getOrCreatePrincipal = function (principalData) {
             return new Promise(function (resolve, reject) {
-                getResponse(resolve, reject, "POST", impl.config.serviceHost + '/auth/v1/principals', principalData)
+                getResponse(resolve, reject, "POST", impl.config.authServiceURL + '/auth/v1/principals', principalData)
             })
         }
 
-        /*
-            registerFIDOKey starts the registration flow an already authenticated principal
-            identitified by `username`. If successful, this Promise-based function resolves 
-            with the authenticator that was successfully registered.
-        */
-        impl.registerFIDOKey = async function (username) {
-            var a11r;
-            return new Promise(async (resolve, reject) => {
-                await getResponsePromise("GET",
-                    impl.config.serviceHost + '/auth/v1/start_fido_registration/' + username)
-                    .then((credentialCreationOptions) => {
-                        credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge);
-                        credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id);
-                        if (credentialCreationOptions.publicKey.excludeCredentials) {
-                            for (var i = 0; i < credentialCreationOptions.publicKey.excludeCredentials.length; i++) {
-                                credentialCreationOptions.publicKey.excludeCredentials[i].id = bufferDecode(credentialCreationOptions.publicKey.excludeCredentials[i].id);
-                            }
+        impl.registerFIDOKey = function (username) {
+            return getJSONData(impl.config.authServiceURL + '/auth/v1/start_fido_registration/' + username)
+                .then(credentialCreationOptions => {
+                    credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge);
+                    credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id);
+                    if (credentialCreationOptions.publicKey.excludeCredentials) {
+                        for (var i = 0; i < credentialCreationOptions.publicKey.excludeCredentials.length; i++) {
+                            credentialCreationOptions.publicKey.excludeCredentials[i].id = bufferDecode(credentialCreationOptions.publicKey.excludeCredentials[i].id);
                         }
-                        if (impl.debug) {
-                            console.log("inbound create options: ", credentialCreationOptions.publicKey);
-                        }
-                        return navigator.credentials.create({
-                            publicKey: credentialCreationOptions.publicKey
-                        })
+                    }
+                    if (impl.debug) {
+                        console.log("inbound create options: ", credentialCreationOptions.publicKey);
+                    }
+                    return navigator.credentials.create({
+                        publicKey: credentialCreationOptions.publicKey
                     })
-                    .then(async function (credential) {
-                        let attestationObject = credential.response.attestationObject;
-                        let clientDataJSON = credential.response.clientDataJSON;
-                        let rawId = credential.rawId;
+                })
+                .then(async credential => {
+                    let attestationObject = credential.response.attestationObject;
+                    let clientDataJSON = credential.response.clientDataJSON;
+                    let rawId = credential.rawId;
 
-                        await getResponsePromise("POST",
-                            impl.config.serviceHost + '/auth/v1/finish_fido_registration/' + username,
-                            JSON.stringify({
-                                id: credential.id,
-                                rawId: bufferEncode(rawId),
-                                type: credential.type,
-                                response: {
-                                    attestationObject: bufferEncode(attestationObject),
-                                    clientDataJSON: bufferEncode(clientDataJSON),
-                                },
-                            }))
-                            .then((autheticator) => {
-                                a11r = autheticator
-                            })
-                            .catch(function (response) {
-                                throw new Error(response.responseText);
-                            })
-                    })
-                    .then((success) => {
-                        if (impl.debug) {
-                            console.log('resolving with a11r:', a11r)
+                    let data = {
+                        id: credential.id,
+                        rawId: bufferEncode(rawId),
+                        type: credential.type,
+                        response: {
+                            attestationObject: bufferEncode(attestationObject),
+                            clientDataJSON: bufferEncode(clientDataJSON),
+                        },
+                    }
+
+                    return await postJSONData(impl.config.authServiceURL + '/auth/v1/finish_fido_registration/' + username, data)
+                })
+                /*
+                .then(async authenticator => {
+                    console.log("start wait of register ofte key")
+                    await registerOfteKey(username)
+                        .then((resp) => {
+                            console.log("after wait of register ofte key", resp)
+                        })
+                })
+                */
+        }
+
+
+        impl.registerFIDOKeyOLD = async function (username) {
+            return await getResponsePromise("GET",
+                impl.config.authServiceURL + '/auth/v1/start_fido_registration/' + username)
+                .then((credentialCreationOptions) => {
+                    credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge);
+                    credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id);
+                    if (credentialCreationOptions.publicKey.excludeCredentials) {
+                        for (var i = 0; i < credentialCreationOptions.publicKey.excludeCredentials.length; i++) {
+                            credentialCreationOptions.publicKey.excludeCredentials[i].id = bufferDecode(credentialCreationOptions.publicKey.excludeCredentials[i].id);
                         }
-                        resolve(a11r)
+                    }
+                    if (impl.debug) {
+                        console.log("inbound create options: ", credentialCreationOptions.publicKey);
+                    }
+                    return navigator.credentials.create({
+                        publicKey: credentialCreationOptions.publicKey
                     })
-                    .catch((error) => {
-                        if (impl.debug) {
-                            console.log("failed to register " + username, error)
-                        }
-                        reject("failed to reg", username, "error", error)
-                    })
-            })
+                })
+                .then(function (credential) {
+                    let attestationObject = credential.response.attestationObject;
+                    let clientDataJSON = credential.response.clientDataJSON;
+                    let rawId = credential.rawId;
+
+                    return getResponsePromise("POST",
+                        impl.config.authServiceURL + '/auth/v1/finish_fido_registration/' + username,
+                        JSON.stringify({
+                            id: credential.id,
+                            rawId: bufferEncode(rawId),
+                            type: credential.type,
+                            response: {
+                                attestationObject: bufferEncode(attestationObject),
+                                clientDataJSON: bufferEncode(clientDataJSON),
+                            },
+                        }))
+                })
+                .then(function (a11r) {
+                    console.log("after finish fido:", a11r)
+                    if (a11r.certLabel !== undefined && a11r.certLabel.startsWith("Ofte")) {
+                        return registerOfteKey(username)
+                    }
+                    a11r.isOfteKey = false
+                    return (a11r)
+                })
+                .then(function (a11r) {
+                    console.log("in final then clause...")
+                    return (a11r)
+                })
+                .catch((error) => {
+                    if (impl.debug) {
+                        console.log("failed to register " + username, error)
+                    }
+                    //reject("failed to reg " + username + " error " + error)
+                    throw new Error("failed to reg " + username + " error " + error)
+                })
         }
 
         /*
@@ -143,20 +182,20 @@ THE SOFTWARE.
             This assertion contains a signature created using the private key. The server uses the public key retrieved 
             during registration to verify this signature.
 
-            If the a11r being logged in is an Ofte key, a CA session will be started.
+            If the authenticator being logged in is an Ofte key, a CA session will be started.
         */
         impl.loginFIDOKey = async function (username) {
             return new Promise(async (resolve, reject) => {
                 var result
                 await getResponsePromise("GET",
-                    impl.config.serviceHost + '/auth/v1/start_fido_login/' + username)
+                    impl.config.authServiceURL + '/auth/v1/start_fido_login/' + username)
                     .then((credentialRequestOptions) => {
                         credentialRequestOptions.publicKey.userVerification = 'discouraged';
                         credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
                         credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
                             listItem.id = bufferDecode(listItem.id)
                         });
-        
+
                         return navigator.credentials.get({
                             publicKey: credentialRequestOptions.publicKey,
                             password: true
@@ -168,9 +207,9 @@ THE SOFTWARE.
                         let rawId = assertion.rawId;
                         let sig = assertion.response.signature;
                         let userHandle = assertion.response.userHandle;
-        
+
                         await getResponsePromise("POST",
-                            impl.config.serviceHost + '/auth/v1/finish_fido_login/' + username,
+                            impl.config.authServiceURL + '/auth/v1/finish_fido_login/' + username,
                             JSON.stringify({
                                 id: assertion.id,
                                 rawId: bufferEncode(rawId),
@@ -197,7 +236,7 @@ THE SOFTWARE.
                             sessionID = result.value
                             if (impl.config.debug) {
                                 console.log('Starting Ofte CA session', sessionID)
-                            }                            
+                            }
                             broadcastEvent('ofte-session-start', sessionID)
                             startCA()
                         }
@@ -208,58 +247,22 @@ THE SOFTWARE.
                         reject("failed to auth", username, "error", error)
                     })
             })
-        }        
-
-        /* 
-            registerOfteKey finalizes the registration of a Ofte key by associating a 
-            principal identified by `username` with the authenticator.
-        */
-        impl.registerOfteKey = function (username) {
-
-            let callback = function (resp) {
-                let ofteError = ofteU2FError(resp)
-                if (ofteError != "") {
-                    throw new Error(ofteError)
-                }
-                var request = new XMLHttpRequest();
-                request.open('POST', impl.config.serviceHost + "/auth/v1/finish_ofte_registration/" + username, true);
-                request.setRequestHeader('Content-Type', 'application/json;');
-
-                request.onload = function () {
-                    if (this.status == 200) {
-                        broadcastEvent('ofte-key-registered', JSON.parse(this.response))
-                    } else {
-                        throw new Error(this.response.responseText)
-                    }
-                };
-                request.onerror = function () {
-                    throw new Error('Connection error')
-                };
-                request.send(JSON.stringify(resp))
-            }
-
-            var request = new XMLHttpRequest();
-            request.open('GET', impl.config.serviceHost + "/auth/v1/start_ofte_registration/" + username, true);
-
-            request.onload = function () {
-                if (this.status == 200) {
-                    let req = JSON.parse(request.responseText)
-                    u2f.register(req.appId, req.registerRequests, req.registeredKeys, callback, 30);
-                } else {
-                    throw new Error(this.response.responseText)
-                }
-            };
-            request.onerror = function () {
-                throw new Error('Connection error')
-            };
-            request.send()
         }
 
-        impl.fetch = function (method, url, data, contentType = "application/json", timeout = impl.config.networkTimeout) {
+        impl.request = function (method, url, data, contentType = "application/json", timeout = impl.config.networkTimeout) {
             if (sessionID === "") {
                 throw new Error("SessionID is null")
             }
-        
+            return new Promise(function (resolve, reject) {
+                getResponse(resolve, reject, method, url, data, [["Ofte-SessionID", sessionID]], contentType, timeout)
+            })
+        }
+
+        impl.requestStrong = function (method, url, data, contentType = "application/json", timeout = impl.config.networkTimeout) {
+            if (sessionID === "") {
+                throw new Error("SessionID is null")
+            }
+
             return new Promise(function (resolve, reject) {
 
                 let t0 = performance.now()
@@ -269,23 +272,23 @@ THE SOFTWARE.
                         throw new Error(ofteError)
                     }
                     var request = new XMLHttpRequest();
-                    request.open('POST', impl.config.serviceHost + "/auth/v1/finish_ofte_access/" + sessionID, true);
+                    request.open('POST', impl.config.authServiceURL + "/auth/v1/finish_ofte_access/" + sessionID, true);
                     request.setRequestHeader('Content-Type', 'application/json;');
-        
+
                     request.onload = async function () {
                         if (this.status == 200) {
                             resetTimer(sessionID)
                             let token = this.getResponseHeader("Ofte-AccessToken")
                             await getResponse(resolve, reject, method, url, data, [["Ofte-SessionID", sessionID], ["Ofte-AccessToken", token]], contentType, timeout)
-                            .then(() => {
-                                if (impl.config.debug) {
-                                    console.log("fetch took " + (performance.now() - t0) + " milliseconds");
-                                }
-                                broadcastEvent('ofte-access', url)
-                            })
-                            .catch((err) => {
-                                broadcastEvent('ofte-error', err)
-                            })
+                                .then(() => {
+                                    if (impl.config.debug) {
+                                        console.log("requestStrong took " + (performance.now() - t0) + " milliseconds");
+                                    }
+                                    broadcastEvent('ofte-access', url)
+                                })
+                                .catch((err) => {
+                                    broadcastEvent('ofte-error', err)
+                                })
                         } else {
                             throw new Error(this.response.responseText)
                         }
@@ -293,13 +296,13 @@ THE SOFTWARE.
                     request.onerror = function () {
                         throw new Error('Connection error')
                     };
-        
+
                     request.send(JSON.stringify(resp))
                 }
-        
+
                 var request = new XMLHttpRequest();
-                request.open('GET', impl.config.serviceHost + "/auth/v1/start_ofte_access/" + sessionID, true);
-        
+                request.open('GET', impl.config.authServiceURL + "/auth/v1/start_ofte_access/" + sessionID, true);
+
                 request.onload = function () {
                     if (this.status == 200) {
                         let req = JSON.parse(request.responseText)
@@ -315,15 +318,119 @@ THE SOFTWARE.
             })
         }
 
-        impl.endSession = function() {
+        impl.endSession = function () {
             stopCA()
             let session = sessionID
-            impl.sessionID = ""            
-            return getResponsePromise("POST", impl.config.serviceHost + "/auth/v1/end_session/" + session)
+            impl.sessionID = ""
+            return getResponsePromise("POST", impl.config.authServiceURL + "/auth/v1/end_session/" + session)
         }
 
         // Private functions
         // --------- • ---------
+
+        const status = response => {
+            if (response.status >= 200 && response.status < 300) {
+                return Promise.resolve(response)
+            }
+            return Promise.reject(new Error(response.statusText))
+        }
+
+        const json = response => response.json()
+
+        async function getJSONData(url) {
+            return await fetch(url)
+                .then(status)
+                .then(json)
+        }
+
+        async function postJSONData(url, data = {}) {
+            let options = {
+                method: 'POST',
+                credentials: 'omit', // include, *same-origin, omit
+            }
+            if (!hasJSONStructure(data)) {
+                options.body = JSON.stringify(data)
+            }
+            return await fetch(url, options)
+            .then(status)
+            .then(json)
+        }
+
+        impl.registerOfteKey = function (username) {
+            return new Promise((resolve, reject) => {
+                var a11r
+
+                const callback = function (resp) {
+                    console.log('in callback method', resp)
+                    let ofteError = ofteU2FError(resp)
+                    if (ofteError != "") {
+                        reject(ofteError)
+                    }
+                    postJSONData(impl.config.authServiceURL + "/auth/v1/finish_ofte_registration/" + username, resp)
+                        .then(resp => {
+                            resp.isOfteKey = true
+                            console.log('resp:', resp)
+                            broadcastEvent('ofte-key-registered', resp)
+                            a11r = resp
+                            resolve(a11r)
+                        })
+                        .catch(err => {
+                            reject(err)
+                        })
+                }    
+
+                getJSONData(impl.config.authServiceURL + "/auth/v1/start_ofte_registration/" + username)
+                .then(async resp => {
+                    broadcastEvent('ofte-key-start-registration', resp)
+                    console.log("before u2f register")
+                    u2f.register(resp.appId, resp.registerRequests, resp.registeredKeys, callback, 10);
+                    console.log("after u2f register")
+                })
+                .catch(err => {
+                    reject(err)
+                })
+
+                console.log('returning from register ofte key')
+            })
+        }
+
+        function registerOfteKeyOLD(username) {
+            var _resolve
+            var _reject
+
+            var callback = function (resp) {
+                let ofteError = ofteU2FError(resp)
+                if (ofteError != "") {
+                    _reject(ofteError)
+                }
+                getResponsePromise('POST',
+                    impl.config.authServiceURL + "/auth/v1/finish_ofte_registration/" + username,
+                    resp)
+                    .then(resp => {
+                        resp.isOfteKey = true
+                        console.log('resp:', resp)
+                        broadcastEvent('ofte-key-registered', resp)
+                        _resolve(resp)
+                    })
+                    .catch(err => {
+                        _reject(err)
+                    })
+            }
+
+            return new Promise((resolve, reject) => {
+                _resolve = resolve
+                _reject = reject
+                getResponsePromise("GET", impl.config.authServiceURL + "/auth/v1/start_ofte_registration/" + username)
+                    .then(async resp => {
+                        broadcastEvent('ofte-key-start-registration', resp)
+                        await u2f.register(resp.appId, resp.registerRequests, resp.registeredKeys, callback, 10);
+                    })
+                    .catch(err => {
+                        reject(err)
+                    })
+                console.log("here at 394....")
+            })
+        }
 
         function getResponsePromise(method, url, data, headers = [], contentType = "application/json", timeout = impl.config.networkTimeout) {
             return new Promise(function (resolve, reject) {
@@ -380,8 +487,6 @@ THE SOFTWARE.
             xhr.send(data)
         }
 
-        var added;
-
         function ofteAssert() {
             if (sessionID === "") {
                 throw new Error("SessionID is nil")
@@ -393,9 +498,9 @@ THE SOFTWARE.
                     throw new Error(ofteError)
                 }
                 var request = new XMLHttpRequest();
-                request.open('POST', impl.config.serviceHost + "/auth/v1/finish_ofte_assert/" + sessionID, true);
+                request.open('POST', impl.config.authServiceURL + "/auth/v1/finish_ofte_assert/" + sessionID, true);
                 request.setRequestHeader('Content-Type', 'application/json;');
-        
+
                 request.onload = function () {
                     if (this.status == 200) {
                         broadcastEvent('ofte-key-assert', sessionID)
@@ -408,10 +513,10 @@ THE SOFTWARE.
                 };
                 request.send(JSON.stringify(resp))
             }
-        
+
             var request = new XMLHttpRequest();
-            request.open('GET', impl.config.serviceHost + "/auth/v1/start_ofte_assert/" + sessionID, true);
-        
+            request.open('GET', impl.config.authServiceURL + "/auth/v1/start_ofte_assert/" + sessionID, true);
+
             request.onload = function () {
                 if (this.status == 200) {
                     let req = JSON.parse(request.responseText)
@@ -453,21 +558,21 @@ THE SOFTWARE.
             ofteAssert()
             timer = window.setTimeout(startCA, impl.config.interval)
         }
-        
+
         function stopCA() {
             window.clearTimeout(timer)
         }
-        
+
         function resetTimer() {
             window.clearTimeout(timer)
             timer = window.setTimeout(startCA, impl.config.interval)
         }
-        
+
         function broadcastEvent(eventName, detail = null) {
             let event = new CustomEvent(eventName, { detail: detail })
             document.dispatchEvent(event)
         }
-        
+
 
         // Base64 to ArrayBuffer
         function bufferDecode(value) {
@@ -593,20 +698,26 @@ THE SOFTWARE.
         var scripts = document.getElementsByTagName('script');
         var lastScript = scripts[scripts.length - 1];
         window.ofte.config = {
-            serviceHost: lastScript.getAttribute("data-service-host") ? lastScript.getAttribute("data-service-host") : window.ofte.config.serviceURL,
+            authServiceURL: lastScript.getAttribute("data-auth-service-url") ? lastScript.getAttribute("data-auth-service-url") : window.ofte.config.authServiceURL,
             interval: parseInt(lastScript.getAttribute("data-interval") ? lastScript.getAttribute("data-interval") : window.ofte.config.interval),
             networkTimeout: parseInt(lastScript.getAttribute("data-network-timeout") ? lastScript.getAttribute("data-network-timeout") : window.ofte.config.networkTimeout),
             debug: lastScript.getAttribute("data-debug") ? (lastScript.getAttribute("data-debug") == 'true') : window.ofte.config.debug
         }
         // TODO: validate passed config variables
 
-        fetch(window.ofte.config.serviceHost + '/auth/v1/version')
-            .then((response) => response.json())
+        if (window.ofte.config.authServiceURL === undefined) {
+            let msg = "Ofte Error: the auth service URL is undefined. See https://ofte.io/todo.html for configuration help"
+            console.log(msg)
+            throw new Error(msg)
+        }
+
+        fetch(window.ofte.config.authServiceURL + '/auth/v1/version')
+            .then((response) => response.text())
             .then((data) => {
-                console.log('Ofte Auth Service version:', data)
+                console.log(data)
             })
             .catch((err) => {
-                console.log('error connecting to Ofte Auth Service', err)
+                console.log('Ofte Error: error connecting to Ofte Auth Service ' + window.ofte.config.authServiceURL, err)
             })
     }
 
@@ -644,7 +755,7 @@ var js_api_version;
 // The Chrome packaged app extension ID.
 // Uncomment this if you want to deploy a server instance that uses
 // the package Chrome app and does not require installing the U2F Chrome extension.
- u2f.EXTENSION_ID = 'kmendfapggjehodndflmmgagdbamhnfd';
+u2f.EXTENSION_ID = 'kmendfapggjehodndflmmgagdbamhnfd';
 // The U2F Chrome extension ID.
 // Uncomment this if you want to deploy a server instance that uses
 // the U2F Chrome extension to authenticate.
@@ -799,53 +910,53 @@ u2f.GetJsApiVersionResponse;
  * available mechanisms.
  * @param {function((MessagePort|u2f.WrappedChromeRuntimePort_))} callback
  */
-u2f.getMessagePort = function(callback) {
-  if (typeof chrome != 'undefined' && chrome.runtime) {
-    // The actual message here does not matter, but we need to get a reply
-    // for the callback to run. Thus, send an empty signature request
-    // in order to get a failure response.
-    var msg = {
-        type: u2f.MessageTypes.U2F_SIGN_REQUEST,
-        signRequests: []
-    };
-    chrome.runtime.sendMessage(u2f.EXTENSION_ID, msg, function() {
-      if (!chrome.runtime.lastError) {
-        // We are on a whitelisted origin and can talk directly
-        // with the extension.
-        u2f.getChromeRuntimePort_(callback);
-      } else {
-        // chrome.runtime was available, but we couldn't message
-        // the extension directly, use iframe
+u2f.getMessagePort = function (callback) {
+    if (typeof chrome != 'undefined' && chrome.runtime) {
+        // The actual message here does not matter, but we need to get a reply
+        // for the callback to run. Thus, send an empty signature request
+        // in order to get a failure response.
+        var msg = {
+            type: u2f.MessageTypes.U2F_SIGN_REQUEST,
+            signRequests: []
+        };
+        chrome.runtime.sendMessage(u2f.EXTENSION_ID, msg, function () {
+            if (!chrome.runtime.lastError) {
+                // We are on a whitelisted origin and can talk directly
+                // with the extension.
+                u2f.getChromeRuntimePort_(callback);
+            } else {
+                // chrome.runtime was available, but we couldn't message
+                // the extension directly, use iframe
+                u2f.getIframePort_(callback);
+            }
+        });
+    } else if (u2f.isAndroidChrome_()) {
+        u2f.getAuthenticatorPort_(callback);
+    } else if (u2f.isIosChrome_()) {
+        u2f.getIosPort_(callback);
+    } else {
+        // chrome.runtime was not available at all, which is normal
+        // when this origin doesn't have access to any extensions.
         u2f.getIframePort_(callback);
-      }
-    });
-  } else if (u2f.isAndroidChrome_()) {
-    u2f.getAuthenticatorPort_(callback);
-  } else if (u2f.isIosChrome_()) {
-    u2f.getIosPort_(callback);
-  } else {
-    // chrome.runtime was not available at all, which is normal
-    // when this origin doesn't have access to any extensions.
-    u2f.getIframePort_(callback);
-  }
+    }
 };
 
 /**
  * Detect chrome running on android based on the browser's useragent.
  * @private
  */
-u2f.isAndroidChrome_ = function() {
-  var userAgent = navigator.userAgent;
-  return userAgent.indexOf('Chrome') != -1 &&
-  userAgent.indexOf('Android') != -1;
+u2f.isAndroidChrome_ = function () {
+    var userAgent = navigator.userAgent;
+    return userAgent.indexOf('Chrome') != -1 &&
+        userAgent.indexOf('Android') != -1;
 };
 
 /**
  * Detect chrome running on iOS based on the browser's platform.
  * @private
  */
-u2f.isIosChrome_ = function() {
-  return $.inArray(navigator.platform, ["iPhone", "iPad", "iPod"]) > -1;
+u2f.isIosChrome_ = function () {
+    return $.inArray(navigator.platform, ["iPhone", "iPad", "iPod"]) > -1;
 };
 
 /**
@@ -853,12 +964,12 @@ u2f.isIosChrome_ = function() {
  * @param {function(u2f.WrappedChromeRuntimePort_)} callback
  * @private
  */
-u2f.getChromeRuntimePort_ = function(callback) {
-  var port = chrome.runtime.connect(u2f.EXTENSION_ID,
-      {'includeTlsChannelId': true});
-  setTimeout(function() {
-    callback(new u2f.WrappedChromeRuntimePort_(port));
-  }, 0);
+u2f.getChromeRuntimePort_ = function (callback) {
+    var port = chrome.runtime.connect(u2f.EXTENSION_ID,
+        { 'includeTlsChannelId': true });
+    setTimeout(function () {
+        callback(new u2f.WrappedChromeRuntimePort_(port));
+    }, 0);
 };
 
 /**
@@ -866,10 +977,10 @@ u2f.getChromeRuntimePort_ = function(callback) {
  * @param {function(u2f.WrappedAuthenticatorPort_)} callback
  * @private
  */
-u2f.getAuthenticatorPort_ = function(callback) {
-  setTimeout(function() {
-    callback(new u2f.WrappedAuthenticatorPort_());
-  }, 0);
+u2f.getAuthenticatorPort_ = function (callback) {
+    setTimeout(function () {
+        callback(new u2f.WrappedAuthenticatorPort_());
+    }, 0);
 };
 
 /**
@@ -877,10 +988,10 @@ u2f.getAuthenticatorPort_ = function(callback) {
  * @param {function(u2f.WrappedIosPort_)} callback
  * @private
  */
-u2f.getIosPort_ = function(callback) {
-  setTimeout(function() {
-    callback(new u2f.WrappedIosPort_());
-  }, 0);
+u2f.getIosPort_ = function (callback) {
+    setTimeout(function () {
+        callback(new u2f.WrappedIosPort_());
+    }, 0);
 };
 
 /**
@@ -889,8 +1000,8 @@ u2f.getIosPort_ = function(callback) {
  * @constructor
  * @private
  */
-u2f.WrappedChromeRuntimePort_ = function(port) {
-  this.port_ = port;
+u2f.WrappedChromeRuntimePort_ = function (port) {
+    this.port_ = port;
 };
 
 /**
@@ -901,35 +1012,35 @@ u2f.WrappedChromeRuntimePort_ = function(port) {
  * @return {Object}
  */
 u2f.formatSignRequest_ =
-  function(appId, challenge, registeredKeys, timeoutSeconds, reqId) {
-  if (js_api_version === undefined || js_api_version < 1.1) {
-    // Adapt request to the 1.0 JS API
-    var signRequests = [];
-    for (var i = 0; i < registeredKeys.length; i++) {
-      signRequests[i] = {
-          version: registeredKeys[i].version,
-          challenge: challenge,
-          keyHandle: registeredKeys[i].keyHandle,
-          appId: appId
-      };
-    }
-    return {
-      type: u2f.MessageTypes.U2F_SIGN_REQUEST,
-      signRequests: signRequests,
-      timeoutSeconds: timeoutSeconds,
-      requestId: reqId
+    function (appId, challenge, registeredKeys, timeoutSeconds, reqId) {
+        if (js_api_version === undefined || js_api_version < 1.1) {
+            // Adapt request to the 1.0 JS API
+            var signRequests = [];
+            for (var i = 0; i < registeredKeys.length; i++) {
+                signRequests[i] = {
+                    version: registeredKeys[i].version,
+                    challenge: challenge,
+                    keyHandle: registeredKeys[i].keyHandle,
+                    appId: appId
+                };
+            }
+            return {
+                type: u2f.MessageTypes.U2F_SIGN_REQUEST,
+                signRequests: signRequests,
+                timeoutSeconds: timeoutSeconds,
+                requestId: reqId
+            };
+        }
+        // JS 1.1 API
+        return {
+            type: u2f.MessageTypes.U2F_SIGN_REQUEST,
+            appId: appId,
+            challenge: challenge,
+            registeredKeys: registeredKeys,
+            timeoutSeconds: timeoutSeconds,
+            requestId: reqId
+        };
     };
-  }
-  // JS 1.1 API
-  return {
-    type: u2f.MessageTypes.U2F_SIGN_REQUEST,
-    appId: appId,
-    challenge: challenge,
-    registeredKeys: registeredKeys,
-    timeoutSeconds: timeoutSeconds,
-    requestId: reqId
-  };
-};
 
 /**
  * Format and return a register request compliant with the JS API version supported by the extension..
@@ -940,54 +1051,54 @@ u2f.formatSignRequest_ =
  * @return {Object}
  */
 u2f.formatRegisterRequest_ =
-  function(appId, registeredKeys, registerRequests, timeoutSeconds, reqId) {
-  if (js_api_version === undefined || js_api_version < 1.1) {
-    // Adapt request to the 1.0 JS API
-    for (var i = 0; i < registerRequests.length; i++) {
-      registerRequests[i].appId = appId;
-    }
-    var signRequests = [];
-    for (var i = 0; i < registeredKeys.length; i++) {
-      signRequests[i] = {
-          version: registeredKeys[i].version,
-          challenge: registerRequests[0],
-          keyHandle: registeredKeys[i].keyHandle,
-          appId: appId
-      };
-    }
-    return {
-      type: u2f.MessageTypes.U2F_REGISTER_REQUEST,
-      signRequests: signRequests,
-      registerRequests: registerRequests,
-      timeoutSeconds: timeoutSeconds,
-      requestId: reqId
+    function (appId, registeredKeys, registerRequests, timeoutSeconds, reqId) {
+        if (js_api_version === undefined || js_api_version < 1.1) {
+            // Adapt request to the 1.0 JS API
+            for (var i = 0; i < registerRequests.length; i++) {
+                registerRequests[i].appId = appId;
+            }
+            var signRequests = [];
+            for (var i = 0; i < registeredKeys.length; i++) {
+                signRequests[i] = {
+                    version: registeredKeys[i].version,
+                    challenge: registerRequests[0],
+                    keyHandle: registeredKeys[i].keyHandle,
+                    appId: appId
+                };
+            }
+            return {
+                type: u2f.MessageTypes.U2F_REGISTER_REQUEST,
+                signRequests: signRequests,
+                registerRequests: registerRequests,
+                timeoutSeconds: timeoutSeconds,
+                requestId: reqId
+            };
+        }
+        // JS 1.1 API
+        return {
+            type: u2f.MessageTypes.U2F_REGISTER_REQUEST,
+            appId: appId,
+            registerRequests: registerRequests,
+            registeredKeys: registeredKeys,
+            timeoutSeconds: timeoutSeconds,
+            requestId: reqId
+        };
     };
-  }
-  // JS 1.1 API
-  return {
-    type: u2f.MessageTypes.U2F_REGISTER_REQUEST,
-    appId: appId,
-    registerRequests: registerRequests,
-    registeredKeys: registeredKeys,
-    timeoutSeconds: timeoutSeconds,
-    requestId: reqId
-  };
-};
 
 async function digestMessage(message) {
-  const msgUint8 = new TextEncoder().encode(message);                           // encode as (utf-8) Uint8Array
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);           // hash the message
-  const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
-  return hashHex;
+    const msgUint8 = new TextEncoder().encode(message);                           // encode as (utf-8) Uint8Array
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);           // hash the message
+    const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
+    return hashHex;
 }
 
 /**
  * Posts a message on the underlying channel.
  * @param {Object} message
  */
-u2f.WrappedChromeRuntimePort_.prototype.postMessage = function(message) {
-  this.port_.postMessage(message);
+u2f.WrappedChromeRuntimePort_.prototype.postMessage = function (message) {
+    this.port_.postMessage(message);
 };
 
 
@@ -998,46 +1109,46 @@ u2f.WrappedChromeRuntimePort_.prototype.postMessage = function(message) {
  * @param {function({data: Object})} handler
  */
 u2f.WrappedChromeRuntimePort_.prototype.addEventListener =
-    function(eventName, handler) {
-  var name = eventName.toLowerCase();
-  if (name == 'message' || name == 'onmessage') {
-    this.port_.onMessage.addListener(function(message) {
-      // Emulate a minimal MessageEvent object
-      handler({'data': message});
-    });
-  } else {
-    console.error('WrappedChromeRuntimePort only supports onMessage');
-  }
-};
+    function (eventName, handler) {
+        var name = eventName.toLowerCase();
+        if (name == 'message' || name == 'onmessage') {
+            this.port_.onMessage.addListener(function (message) {
+                // Emulate a minimal MessageEvent object
+                handler({ 'data': message });
+            });
+        } else {
+            console.error('WrappedChromeRuntimePort only supports onMessage');
+        }
+    };
 
 /**
  * Wrap the Authenticator app with a MessagePort interface.
  * @constructor
  * @private
  */
-u2f.WrappedAuthenticatorPort_ = function() {
-  this.requestId_ = -1;
-  this.requestObject_ = null;
+u2f.WrappedAuthenticatorPort_ = function () {
+    this.requestId_ = -1;
+    this.requestObject_ = null;
 }
 
 /**
  * Launch the Authenticator intent.
  * @param {Object} message
  */
-u2f.WrappedAuthenticatorPort_.prototype.postMessage = function(message) {
-  var intentUrl =
-    u2f.WrappedAuthenticatorPort_.INTENT_URL_BASE_ +
-    ';S.request=' + encodeURIComponent(JSON.stringify(message)) +
-    ';end';
-  document.location = intentUrl;
+u2f.WrappedAuthenticatorPort_.prototype.postMessage = function (message) {
+    var intentUrl =
+        u2f.WrappedAuthenticatorPort_.INTENT_URL_BASE_ +
+        ';S.request=' + encodeURIComponent(JSON.stringify(message)) +
+        ';end';
+    document.location = intentUrl;
 };
 
 /**
  * Tells what type of port this is.
  * @return {String} port type
  */
-u2f.WrappedAuthenticatorPort_.prototype.getPortType = function() {
-  return "WrappedAuthenticatorPort_";
+u2f.WrappedAuthenticatorPort_.prototype.getPortType = function () {
+    return "WrappedAuthenticatorPort_";
 };
 
 
@@ -1046,17 +1157,17 @@ u2f.WrappedAuthenticatorPort_.prototype.getPortType = function() {
  * @param {string} eventName
  * @param {function({data: Object})} handler
  */
-u2f.WrappedAuthenticatorPort_.prototype.addEventListener = function(eventName, handler) {
-  var name = eventName.toLowerCase();
-  if (name == 'message') {
-    var self = this;
-    /* Register a callback to that executes when
-     * chrome injects the response. */
-    window.addEventListener(
-        'message', self.onRequestUpdate_.bind(self, handler), false);
-  } else {
-    console.error('WrappedAuthenticatorPort only supports message');
-  }
+u2f.WrappedAuthenticatorPort_.prototype.addEventListener = function (eventName, handler) {
+    var name = eventName.toLowerCase();
+    if (name == 'message') {
+        var self = this;
+        /* Register a callback to that executes when
+         * chrome injects the response. */
+        window.addEventListener(
+            'message', self.onRequestUpdate_.bind(self, handler), false);
+    } else {
+        console.error('WrappedAuthenticatorPort only supports message');
+    }
 };
 
 /**
@@ -1065,19 +1176,19 @@ u2f.WrappedAuthenticatorPort_.prototype.addEventListener = function(eventName, h
  * @param {Object} message message Object
  */
 u2f.WrappedAuthenticatorPort_.prototype.onRequestUpdate_ =
-    function(callback, message) {
-  var messageObject = JSON.parse(message.data);
-  var intentUrl = messageObject['intentURL'];
+    function (callback, message) {
+        var messageObject = JSON.parse(message.data);
+        var intentUrl = messageObject['intentURL'];
 
-  var errorCode = messageObject['errorCode'];
-  var responseObject = null;
-  if (messageObject.hasOwnProperty('data')) {
-    responseObject = /** @type {Object} */ (
-        JSON.parse(messageObject['data']));
-  }
+        var errorCode = messageObject['errorCode'];
+        var responseObject = null;
+        if (messageObject.hasOwnProperty('data')) {
+            responseObject = /** @type {Object} */ (
+                JSON.parse(messageObject['data']));
+        }
 
-  callback({'data': responseObject});
-};
+        callback({ 'data': responseObject });
+    };
 
 /**
  * Base URL for intents to Authenticator.
@@ -1085,31 +1196,31 @@ u2f.WrappedAuthenticatorPort_.prototype.onRequestUpdate_ =
  * @private
  */
 u2f.WrappedAuthenticatorPort_.INTENT_URL_BASE_ =
-  'intent:#Intent;action=com.google.android.apps.authenticator.AUTHENTICATE';
+    'intent:#Intent;action=com.google.android.apps.authenticator.AUTHENTICATE';
 
 /**
  * Wrap the iOS client app with a MessagePort interface.
  * @constructor
  * @private
  */
-u2f.WrappedIosPort_ = function() {};
+u2f.WrappedIosPort_ = function () { };
 
 /**
  * Launch the iOS client app request
  * @param {Object} message
  */
-u2f.WrappedIosPort_.prototype.postMessage = function(message) {
-  var str = JSON.stringify(message);
-  var url = "u2f://auth?" + encodeURI(str);
-  location.replace(url);
+u2f.WrappedIosPort_.prototype.postMessage = function (message) {
+    var str = JSON.stringify(message);
+    var url = "u2f://auth?" + encodeURI(str);
+    location.replace(url);
 };
 
 /**
  * Tells what type of port this is.
  * @return {String} port type
  */
-u2f.WrappedIosPort_.prototype.getPortType = function() {
-  return "WrappedIosPort_";
+u2f.WrappedIosPort_.prototype.getPortType = function () {
+    return "WrappedIosPort_";
 };
 
 /**
@@ -1117,11 +1228,11 @@ u2f.WrappedIosPort_.prototype.getPortType = function() {
  * @param {string} eventName
  * @param {function({data: Object})} handler
  */
-u2f.WrappedIosPort_.prototype.addEventListener = function(eventName, handler) {
-  var name = eventName.toLowerCase();
-  if (name !== 'message') {
-    console.error('WrappedIosPort only supports message');
-  }
+u2f.WrappedIosPort_.prototype.addEventListener = function (eventName, handler) {
+    var name = eventName.toLowerCase();
+    if (name !== 'message') {
+        console.error('WrappedIosPort only supports message');
+    }
 };
 
 /**
@@ -1129,30 +1240,30 @@ u2f.WrappedIosPort_.prototype.addEventListener = function(eventName, handler) {
  * @param {function(MessagePort)} callback
  * @private
  */
-u2f.getIframePort_ = function(callback) {
-  // Create the iframe
-  var iframeOrigin = 'chrome-extension://' + u2f.EXTENSION_ID;
-  var iframe = document.createElement('iframe');
-  iframe.src = iframeOrigin + '/u2f-comms.html';
-  iframe.setAttribute('style', 'display:none');
-  document.body.appendChild(iframe);
+u2f.getIframePort_ = function (callback) {
+    // Create the iframe
+    var iframeOrigin = 'chrome-extension://' + u2f.EXTENSION_ID;
+    var iframe = document.createElement('iframe');
+    iframe.src = iframeOrigin + '/u2f-comms.html';
+    iframe.setAttribute('style', 'display:none');
+    document.body.appendChild(iframe);
 
-  var channel = new MessageChannel();
-  var ready = function(message) {
-    if (message.data == 'ready') {
-      channel.port1.removeEventListener('message', ready);
-      callback(channel.port1);
-    } else {
-      console.error('First event on iframe port was not "ready"');
-    }
-  };
-  channel.port1.addEventListener('message', ready);
-  channel.port1.start();
+    var channel = new MessageChannel();
+    var ready = function (message) {
+        if (message.data == 'ready') {
+            channel.port1.removeEventListener('message', ready);
+            callback(channel.port1);
+        } else {
+            console.error('First event on iframe port was not "ready"');
+        }
+    };
+    channel.port1.addEventListener('message', ready);
+    channel.port1.start();
 
-  iframe.addEventListener('load', function() {
-    // Deliver the port to the iframe and initialize
-    iframe.contentWindow.postMessage('init', iframeOrigin, [channel.port2]);
-  });
+    iframe.addEventListener('load', function () {
+        // Deliver the port to the iframe and initialize
+        iframe.contentWindow.postMessage('init', iframeOrigin, [channel.port2]);
+    });
 };
 
 
@@ -1198,23 +1309,23 @@ u2f.callbackMap_ = {};
  * @param {function((MessagePort|u2f.WrappedChromeRuntimePort_))} callback
  * @private
  */
-u2f.getPortSingleton_ = function(callback) {
-  if (u2f.port_) {
-    callback(u2f.port_);
-  } else {
-    if (u2f.waitingForPort_.length == 0) {
-      u2f.getMessagePort(function(port) {
-        u2f.port_ = port;
-        u2f.port_.addEventListener('message',
-            /** @type {function(Event)} */ (u2f.responseHandler_));
+u2f.getPortSingleton_ = function (callback) {
+    if (u2f.port_) {
+        callback(u2f.port_);
+    } else {
+        if (u2f.waitingForPort_.length == 0) {
+            u2f.getMessagePort(function (port) {
+                u2f.port_ = port;
+                u2f.port_.addEventListener('message',
+            /** @type {function(Event)} */(u2f.responseHandler_));
 
-        // Careful, here be async callbacks. Maybe.
-        while (u2f.waitingForPort_.length)
-          u2f.waitingForPort_.shift()(u2f.port_);
-      });
+                // Careful, here be async callbacks. Maybe.
+                while (u2f.waitingForPort_.length)
+                    u2f.waitingForPort_.shift()(u2f.port_);
+            });
+        }
+        u2f.waitingForPort_.push(callback);
     }
-    u2f.waitingForPort_.push(callback);
-  }
 };
 
 /**
@@ -1222,16 +1333,17 @@ u2f.getPortSingleton_ = function(callback) {
  * @param {MessageEvent.<u2f.Response>} message
  * @private
  */
-u2f.responseHandler_ = function(message) {
-  var response = message.data;
-  var reqId = response['requestId'];
-  if (!reqId || !u2f.callbackMap_[reqId]) {
-    console.error('Unknown or missing requestId in response.');
-    return;
-  }
-  var cb = u2f.callbackMap_[reqId];
-  delete u2f.callbackMap_[reqId];
-  cb(response['responseData']);
+u2f.responseHandler_ = function (message) {
+    var response = message.data;
+    var reqId = response['requestId'];
+    if (!reqId || !u2f.callbackMap_[reqId]) {
+        console.error('Unknown or missing requestId in response.');
+        return;
+    }
+    var cb = u2f.callbackMap_[reqId];
+    delete u2f.callbackMap_[reqId];
+    console.log('u2f.responseHandler', response)
+    cb(response['responseData']);
 };
 
 /**
@@ -1245,19 +1357,18 @@ u2f.responseHandler_ = function(message) {
  * @param {function((u2f.Error|u2f.SignResponse))} callback
  * @param {number=} opt_timeoutSeconds
  */
-u2f.sign = function(appId, challenge, registeredKeys, callback, opt_timeoutSeconds) {
-  if (js_api_version === undefined) {
-    // Send a message to get the extension to JS API version, then send the actual sign request.
-    u2f.getApiVersion(
-        function (response) {
-          js_api_version = response['js_api_version'] === undefined ? 0 : response['js_api_version'];
-          console.log("Extension JS API Version: ", js_api_version);
-          u2f.sendSignRequest(appId, challenge, registeredKeys, callback, opt_timeoutSeconds);
-        });
-  } else {
-    // We know the JS API version. Send the actual sign request in the supported API version.
-    u2f.sendSignRequest(appId, challenge, registeredKeys, callback, opt_timeoutSeconds);
-  }
+u2f.sign = function (appId, challenge, registeredKeys, callback, opt_timeoutSeconds) {
+    if (js_api_version === undefined) {
+        // Send a message to get the extension to JS API version, then send the actual sign request.
+        u2f.getApiVersion(
+            function (response) {
+                js_api_version = response['js_api_version'] === undefined ? 0 : response['js_api_version'];
+                u2f.sendSignRequest(appId, challenge, registeredKeys, callback, opt_timeoutSeconds);
+            });
+    } else {
+        // We know the JS API version. Send the actual sign request in the supported API version.
+        u2f.sendSignRequest(appId, challenge, registeredKeys, callback, opt_timeoutSeconds);
+    }
 };
 
 /**
@@ -1268,15 +1379,15 @@ u2f.sign = function(appId, challenge, registeredKeys, callback, opt_timeoutSecon
  * @param {function((u2f.Error|u2f.SignResponse))} callback
  * @param {number=} opt_timeoutSeconds
  */
-u2f.sendSignRequest = function(appId, challenge, registeredKeys, callback, opt_timeoutSeconds) {
-  u2f.getPortSingleton_(function(port) {
-    var reqId = ++u2f.reqCounter_;
-    u2f.callbackMap_[reqId] = callback;
-    var timeoutSeconds = (typeof opt_timeoutSeconds !== 'undefined' ?
-        opt_timeoutSeconds : u2f.EXTENSION_TIMEOUT_SEC);
-    var req = u2f.formatSignRequest_(appId, challenge, registeredKeys, timeoutSeconds, reqId);
-    port.postMessage(req);
-  });
+u2f.sendSignRequest = function (appId, challenge, registeredKeys, callback, opt_timeoutSeconds) {
+    u2f.getPortSingleton_(function (port) {
+        var reqId = ++u2f.reqCounter_;
+        u2f.callbackMap_[reqId] = callback;
+        var timeoutSeconds = (typeof opt_timeoutSeconds !== 'undefined' ?
+            opt_timeoutSeconds : u2f.EXTENSION_TIMEOUT_SEC);
+        var req = u2f.formatSignRequest_(appId, challenge, registeredKeys, timeoutSeconds, reqId);
+        port.postMessage(req);
+    });
 };
 
 /**
@@ -1291,21 +1402,20 @@ u2f.sendSignRequest = function(appId, challenge, registeredKeys, callback, opt_t
  * @param {function((u2f.Error|u2f.RegisterResponse))} callback
  * @param {number=} opt_timeoutSeconds
  */
-u2f.register = function(appId, registerRequests, registeredKeys, callback, opt_timeoutSeconds) {
-  if (js_api_version === undefined) {
-    // Send a message to get the extension to JS API version, then send the actual register request.
-    u2f.getApiVersion(
-        function (response) {
-          js_api_version = response['js_api_version'] === undefined ? 0: response['js_api_version'];
-          console.log("Extension JS API Version: ", js_api_version);
-          u2f.sendRegisterRequest(appId, registerRequests, registeredKeys,
-              callback, opt_timeoutSeconds);
-        });
-  } else {
-    // We know the JS API version. Send the actual register request in the supported API version.
-    u2f.sendRegisterRequest(appId, registerRequests, registeredKeys,
-        callback, opt_timeoutSeconds);
-  }
+u2f.register = function (appId, registerRequests, registeredKeys, callback, opt_timeoutSeconds) {
+    if (js_api_version === undefined) {
+        // Send a message to get the extension to JS API version, then send the actual register request.
+        u2f.getApiVersion(
+            function (response) {
+                js_api_version = response['js_api_version'] === undefined ? 0 : response['js_api_version'];
+                u2f.sendRegisterRequest(appId, registerRequests, registeredKeys,
+                    callback, opt_timeoutSeconds);
+            });
+    } else {
+        // We know the JS API version. Send the actual register request in the supported API version.
+        u2f.sendRegisterRequest(appId, registerRequests, registeredKeys,
+            callback, opt_timeoutSeconds);
+    }
 };
 
 /**
@@ -1317,17 +1427,17 @@ u2f.register = function(appId, registerRequests, registeredKeys, callback, opt_t
  * @param {function((u2f.Error|u2f.RegisterResponse))} callback
  * @param {number=} opt_timeoutSeconds
  */
-u2f.sendRegisterRequest = function(appId, registerRequests, registeredKeys, callback, opt_timeoutSeconds) {
-  u2f.getPortSingleton_(function(port) {
-    var reqId = ++u2f.reqCounter_;
-    u2f.callbackMap_[reqId] = callback;
-    var timeoutSeconds = (typeof opt_timeoutSeconds !== 'undefined' ?
-        opt_timeoutSeconds : u2f.EXTENSION_TIMEOUT_SEC);
-    var req = u2f.formatRegisterRequest_(
-        appId, registeredKeys, registerRequests, timeoutSeconds, reqId);
-    console.log('u2f.sendRegisterRequest, sending in request');
-    port.postMessage(req);
-  });
+u2f.sendRegisterRequest = function (appId, registerRequests, registeredKeys, callback, opt_timeoutSeconds) {
+    u2f.getPortSingleton_(function (port) {
+        var reqId = ++u2f.reqCounter_;
+        u2f.callbackMap_[reqId] = callback;
+        var timeoutSeconds = (typeof opt_timeoutSeconds !== 'undefined' ?
+            opt_timeoutSeconds : u2f.EXTENSION_TIMEOUT_SEC);
+        var req = u2f.formatRegisterRequest_(
+            appId, registeredKeys, registerRequests, timeoutSeconds, reqId);
+        console.log('u2f.register: request going in...', req)
+        port.postMessage(req);
+    });
 };
 
 
@@ -1339,34 +1449,34 @@ u2f.sendRegisterRequest = function(appId, registerRequests, registeredKeys, call
  * @param {function((u2f.Error|u2f.GetJsApiVersionResponse))} callback
  * @param {number=} opt_timeoutSeconds
  */
-u2f.getApiVersion = function(callback, opt_timeoutSeconds) {
- u2f.getPortSingleton_(function(port) {
-   // If we are using Android Google Authenticator or iOS client app,
-   // do not fire an intent to ask which JS API version to use.
-   if (port.getPortType) {
-     var apiVersion;
-     switch (port.getPortType()) {
-       case 'WrappedIosPort_':
-       case 'WrappedAuthenticatorPort_':
-         apiVersion = 1.1;
-         break;
+u2f.getApiVersion = function (callback, opt_timeoutSeconds) {
+    u2f.getPortSingleton_(function (port) {
+        // If we are using Android Google Authenticator or iOS client app,
+        // do not fire an intent to ask which JS API version to use.
+        if (port.getPortType) {
+            var apiVersion;
+            switch (port.getPortType()) {
+                case 'WrappedIosPort_':
+                case 'WrappedAuthenticatorPort_':
+                    apiVersion = 1.1;
+                    break;
 
-       default:
-         apiVersion = 0;
-         break;
-     }
-     callback({ 'js_api_version': apiVersion });
-     return;
-   }
-    var reqId = ++u2f.reqCounter_;
-    u2f.callbackMap_[reqId] = callback;
-    var req = {
-      type: u2f.MessageTypes.U2F_GET_API_VERSION_REQUEST,
-      timeoutSeconds: (typeof opt_timeoutSeconds !== 'undefined' ?
-          opt_timeoutSeconds : u2f.EXTENSION_TIMEOUT_SEC),
-      requestId: reqId
-    };
-    port.postMessage(req);
-  });
+                default:
+                    apiVersion = 0;
+                    break;
+            }
+            callback({ 'js_api_version': apiVersion });
+            return;
+        }
+        var reqId = ++u2f.reqCounter_;
+        u2f.callbackMap_[reqId] = callback;
+        var req = {
+            type: u2f.MessageTypes.U2F_GET_API_VERSION_REQUEST,
+            timeoutSeconds: (typeof opt_timeoutSeconds !== 'undefined' ?
+                opt_timeoutSeconds : u2f.EXTENSION_TIMEOUT_SEC),
+            requestId: reqId
+        };
+        port.postMessage(req);
+    });
 };
 
