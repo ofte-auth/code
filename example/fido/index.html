@@ -9,7 +9,6 @@
   <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Material+Icons'>
   <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/vuetify@2.2.8/dist/vuetify.min.css'>
   <link rel='stylesheet' href='styles.css'>
-
 </head>
 
 <body>
@@ -83,7 +82,7 @@
                 <!-- Register -->
                 <v-stepper-step :complete="flowStep > 2" step="2">
                   Register an Authenticator
-                  <small>Plug in your Ofte Key.</small> 
+                  <small>Plug in your Ofte Key.</small>
                 </v-stepper-step>
                 <v-stepper-content step="2">
                   <v-card color="light-green lighten-5 pa-4" class="mb-12 body-1">
@@ -95,43 +94,30 @@
                     </p>
                   </v-card>
                   <v-btn color="primary" v-show="!hasAuthenticator" @click="flowStep = 3">Continue</v-btn>
-                  <v-btn color="primary" v-show="hasAuthenticator" @click="flowStep = 4">Continue</v-btn>
-                  <v-btn color="primary" v-show="hasAuthenticator" @click="registerNewAuthenticator(this.username)">Register another</v-btn>
-                  <v-btn text>Cancel</v-btn>
-                </v-stepper-content>
-
-                <!-- Register Ofte -->
-                <v-stepper-step :complete="flowStep > 3" step="3">
-                  Register an Ofte Authenticator
-                  <small>An additional step for Ofte Keys—this step binds the key to the username.</small>
-                </v-stepper-step>
-                <v-stepper-content step="3">
-                  <v-card color="light-green lighten-5 pa-4" class="mb-12 body-1">
-                    <p>
-                      Because this is an Ofte Key, an additional Authenticator "Presence Test" is
-                      required.
-                    </p>
-                  </v-card>
+                  <v-btn color="primary" v-show="hasAuthenticator" @click="flowStep = 3">Continue</v-btn>
+                  <v-btn color="primary" v-show="hasAuthenticator" @click="registerNewAuthenticator(this.username)">
+                    Register another</v-btn>
                   <v-btn text>Cancel</v-btn>
                 </v-stepper-content>
 
                 <!-- Login -->
-                <v-stepper-step :complete="flowStep > 4" step="4">
+                <v-stepper-step :complete="flowStep > 3" step="3">
                   Login using your Authenticator
                   <small>This step is only needed when logging in.</small>
                 </v-stepper-step>
-                <v-stepper-content step="4">
-                  <v-btn color="primary" @click="flowStep = 4">Continue</v-btn>
+                <v-stepper-content step="3">
+                  <v-btn color="primary" @click="flowStep = 3">Continue</v-btn>
                   <v-btn text>Cancel</v-btn>
                 </v-stepper-content>
 
                 <!-- Observe Ofte Continuous Authentication -->
-                <v-stepper-step :complete="flowStep > 5" step="5">
+                <v-stepper-step :complete="flowStep > 4" step="4">
                   Ofte Continuous Authentication
                   <small>A CA session is now active.</small>
                 </v-stepper-step>
-                <v-stepper-content step="5">
-                  <v-btn color="primary" @click="accessRequest()">Request URI</v-btn>
+                <v-stepper-content step="4">
+                  <v-btn color="primary" @click="fetch()">Request URI</v-btn>
+                  <v-btn color="primary" @click="fetchStrong()">Request URI (Strong)</v-btn>
                   <v-btn color="primary" @click="endSession()">End CA Session</v-btn>
                   <v-container style="max-width: 600px;">
                     <v-timeline dense clipped>
@@ -148,31 +134,15 @@
                 </v-stepper-content>
 
                 <!-- Not an Ofte key -->
-                <v-stepper-step :complete="flowStep > 6" step="6" v-show="sessionID == ''">
+                <v-stepper-step :complete="flowStep > 5" step="5" v-show="sessionID == ''">
                   Operate outside of Ofte CA
                 </v-stepper-step>
-                <v-stepper-content step="6">
+                <v-stepper-content step="5">
                   <p>The autheticator is not an Ofte key, no Continuous Authentication is active.</p>
                   <v-btn @click="flowStep = 1" text>Restart</v-btn>
                 </v-stepper-content>
 
               </v-stepper>
-
-              <v-row justify="center">
-                <v-dialog v-model="displayPressAuth" persistent max-width="320">
-                  <v-card>
-                    <v-img class="black--text align-end" height="240px" src="./touch.png">
-                    </v-img>
-                    <v-card-title>Press Your Authenticator Key</v-card-title>
-                    <v-card-text>Because this is an Ofte Authenticator, please allow us to access it again.
-                    </v-card-text>
-                    <v-card-actions>
-                      <v-spacer></v-spacer>
-                      <v-btn color="black darken-1" text @click="displayPressAuth = false">Cancel</v-btn>
-                    </v-card-actions>
-                  </v-card>
-                </v-dialog>
-              </v-row>
 
             </v-col>
             <v-col></v-col>
@@ -186,11 +156,7 @@
   <script src='https://cdn.jsdelivr.net/npm/babel-polyfill/dist/polyfill.min.js'></script>
   <script src='https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js'></script>
   <script src='https://cdn.jsdelivr.net/npm/vuetify@2.2.8/dist/vuetify.min.js'></script>
-  <!--script type="text/javascript" src="./u2f-api.js"></!--script-->
-  <!--script src="./lib.js"></!--script-->
-  <script src="./ofte.js" 
-    data-service-host="https://localhost:2357"
-    data-debug="true">
+  <script src="https://cdn.ofte.io/js/latest/ofte.min.js" data-service-host="https://localhost:2357" data-debug="true">
   </script>
 
   <script>
@@ -207,7 +173,6 @@
           displayPressAuth: false,
           sessionID: '',
           events: [],
-          input: null,
           timelineCounter: 0,
           rules: {
             required: value => !!value || 'Required.'
@@ -221,15 +186,15 @@
           switch (this.flowStep) {
             case 2:
               this.sessionID = ''
-              await ofte.getOrCreatePrincipal(
+              ofte.getOrCreatePrincipal(
                 {
                   "username": this.username,
                   "displayName": this.displayName,
                   "icon": this.icon
                 })
-                .then(async resp => {
+                .then(resp => {
                   this.principal = resp;
-                  this.hasAuthenticator = this.principal.fidoKeys !== null && this.principal.fidoKeys.length > 0;
+                  this.hasAuthenticator = resp.hasKey
                   if (!this.hasAuthenticator) {
                     this.registerNewAuthenticator(this.username)
                   }
@@ -239,42 +204,36 @@
                 });
               break;
             case 3:
-              this.displayPressAuth = true
-              ofte.registerOfteKey(this.username);
-              break;
-            case 4:
-              ofte.loginFIDOKey(this.username)
+              await ofte.loginKey(this.username)
                 .then(result => {
                   this.sessionID = result.value
-                  this.flowStep = 5
+                  this.flowStep = 4
                 })
                 .catch(error => {
                   console.log(error)
                 })
               break;
-            case 5:
+            case 4:
               if (this.sessionID === '') {
-                this.flowStep = 6
+                this.flowStep = 5
               }
               break;
           }
         },
       },
       methods: {
-        async registerNewAuthenticator(uname) {
-          await ofte.registerFIDOKey(this.username)
-                      .then((key) => {
-                        console.log("Here's the key", key)
-                        if (key.certLabel == "Ofte Key") {
-                          this.flowStep = 3
-                        } else {
-                          this.flowStep = 4
-                        }
-                      })
-                      .catch(error => {
-                        console.log("error", error)
-                        return
-                      })          
+        registerNewAuthenticator(uname) {
+          console.log('index:260')
+          ofte.registerKey(this.username)
+            .then((key) => {
+              console.log('index:262')
+              this.flowStep = 3
+            })
+            .catch(error => {
+              console.log("error", error)
+              return
+            })
+            console.log('index:269')
         },
         addTimelineEvent(event) {
           const time = new Date().toISOString().substr(11, 8) + " GMT"
@@ -284,25 +243,33 @@
             time: new Date().toISOString().substr(11, 8) + " GMT",
           })
         },
-        async accessRequest() {
-          console.log('access request');
-          await ofte.fetch("GET", "https://localhost:2357/test_resource_endpoint/123")
-          .then((resp) => {
-            this.addTimelineEvent({text: "Access URI\n"+resp});
-          })
-          .catch((err) => {
-            console.log('error', err)
-          })
+        async fetch() {
+          await ofte.fetch("GET", "https://localhost:2357/test_resource_endpoint_session_only/123")
+            .then((resp) => {
+              this.addTimelineEvent({ text: "Access URI\n" + resp });
+            })
+            .catch((err) => {
+              console.log('error', err)
+            })
+        },
+        async fetchStrong() {
+          await ofte.fetchStrong("GET", "https://localhost:2357/test_resource_endpoint/123")
+            .then((resp) => {
+              this.addTimelineEvent({ text: "Access URI Strong\n" + resp });
+            })
+            .catch((err) => {
+              console.log('error', err)
+            })
         },
         async endSession() {
           await ofte.endSession()
-          .then(() => {
-            console.log('session ended')
-            this.flowStep = 1
-          })
-          .catch((err) => {
-            console.log('error ending session')
-          })
+            .then(() => {
+              console.log('session ended')
+              this.flowStep = 1
+            })
+            .catch((err) => {
+              console.log('error ending session')
+            })
         }
       },
       computed: {
@@ -312,17 +279,18 @@
       },
       mounted() {
         _this = this
+        document.addEventListener('ofte-key-start-registration', function (event) {
+          console.log('ofte-key-start-registration', event);
+        });
         document.addEventListener('ofte-key-registered', function (event) {
-          console.log('ofte-key-registered!', event);
-          _this.displayPressAuth = false;
-          _this.flowStep = 4
+          console.log('ofte-key-registered', event);
         });
         document.addEventListener('ofte-session-start', function (event) {
           _this.addTimelineEvent({ text: "CA session initiated" })
         }),
-        document.addEventListener('ofte-key-assert', function (event) {
-          _this.addTimelineEvent({ text: "CA session (" + _this.sessionID + ") revived" })
-        });
+          document.addEventListener('ofte-key-assert', function (event) {
+            _this.addTimelineEvent({ text: "CA session (" + _this.sessionID + ") keep-alive" })
+          });
       },
     });
   </script>
