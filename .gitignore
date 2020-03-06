@@ -1,3 +1,2 @@
-/example/portal/certs
-/example/portal/build
-builds
+/example/fido/env.local
+/example/admin/cmd/builds
