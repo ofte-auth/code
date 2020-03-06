@@ -1,0 +1,14 @@
+{
+    "parserOptions": {
+        "ecmaVersion": 2017
+    },
+
+    "env": {
+        "es6": true
+    },
+    "rules": {
+        "quotes": ["error", "single"],
+        "no-cond-assign": ["error", "always"],
+    }
+}
+
