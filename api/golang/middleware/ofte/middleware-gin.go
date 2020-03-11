@@ -26,11 +26,13 @@ func GinSessionAuthMiddleware(ofteAuthEndpoint string) gin.HandlerFunc {
 		} else {
 			resp, err = http.Get(fmt.Sprintf("%s/validate_session/%s", ofteAuthEndpoint, session))
 		}
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		if err != nil || resp.StatusCode != 200 {
 			ctx.AbortWithError(401, err)
 			return
 		}
-		defer resp.Body.Close()
 		ctx.Next()
 	}
 }
@@ -53,11 +55,13 @@ func GinAccessAuthMiddleware(ofteAuthEndpoint string) gin.HandlerFunc {
 		} else {
 			resp, err = http.Get(fmt.Sprintf("%s/validate_access/%s/%s", ofteAuthEndpoint, session, accessToken))
 		}
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		if err != nil || resp.StatusCode != 200 {
 			ctx.AbortWithError(401, err)
 			return
 		}
-		defer resp.Body.Close()
 		ctx.Next()
 	}
 }

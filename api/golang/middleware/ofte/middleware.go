@@ -28,7 +28,9 @@ func SessionAuthMiddleware(ofteAuthEndpoint string) func(http.Handler) http.Hand
 			} else {
 				resp, err = http.Get(fmt.Sprintf("%s/validate_session/%s", ofteAuthEndpoint, session))
 			}
-			defer resp.Body.Close()
+			if resp != nil {
+				defer resp.Body.Close()
+			}
 			if err != nil || resp.StatusCode != 200 {
 				w.WriteHeader(401)
 				_, _ = w.Write([]byte(err.Error()))
@@ -59,7 +61,9 @@ func AccessAuthMiddleware(ofteAuthEndpoint string) func(http.Handler) http.Handl
 			} else {
 				resp, err = http.Get(fmt.Sprintf("%s/validate_access/%s/%s", ofteAuthEndpoint, session, accessToken))
 			}
-			defer resp.Body.Close()
+			if resp != nil {
+				defer resp.Body.Close()
+			}
 			if err != nil || resp.StatusCode != 200 {
 				w.WriteHeader(401)
 				_, _ = w.Write([]byte(err.Error()))
