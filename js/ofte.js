@@ -70,21 +70,23 @@ THE SOFTWARE.
             return new Promise(function (resolve, reject) {
                 getResponse(resolve, reject, 'POST', impl.config.authServiceURL + '/auth/v1/principals', principalData)
             })
-            .then(resp => {
-                resp.hasKey = resp.fidoKeys !== null && resp.fidoKeys.length > 0
-                return resp
-            })
+                .then(resp => {
+                    resp.hasKey = resp.fidoKeys !== null && resp.fidoKeys.length > 0
+                    return resp
+                })
         }
 
         /*
-            registerKey adds a new authenticator to a principal (a person).
+            registerKey adds a new authenticator to a principal.
         */
         impl.registerKey = async function (username) {
             return new Promise(async (resolve, reject) => {
+                let resolved = false
                 await registerFIDOKey(username)
                     .then(authenticator => {
                         broadcastEvent('ofte-key-registered', authenticator)
                         if (!authenticator.isOfteKey) {
+                            resolved = true
                             resolve(authenticator)
                         }
                         return authenticator
@@ -96,13 +98,19 @@ THE SOFTWARE.
                         return authenticator
                     })
                     .then(async authenticator => {
-                        return await (registerOfteKey(username))
+                        if (authenticator.isOfteKey) {
+                            return await (registerOfteKey(username))
+                        } else {
+                            return authenticator
+                        }
                     })
                     .then(authenticator => {
-                        resolve(authenticator)
+                        if (!resolved) {
+                            resolve(authenticator)
+                        }
                     })
                     .catch(err => {
-                        broadcastEvent('ofte-error', err)                        
+                        broadcastEvent('ofte-error', err)
                         reject(err)
                     })
             })
@@ -187,20 +195,24 @@ THE SOFTWARE.
             fetch makes a backend request in which the server must check for the passed session id header
             to ensure the continuous authentication session is active.
         */
-        impl.fetch = function (method, url, data, contentType = 'application/json', timeout = impl.config.networkTimeout) {
+        impl.fetch = function (url, config = {}) {
             if (sessionID === '') {
                 throw new Error('SessionID is null')
             }
-            return new Promise(function (resolve, reject) {
-                getResponse(resolve, reject, method, url, data, [['Ofte-SessionID', sessionID]], contentType, timeout)
-            })
+            config.headers = new Headers(config.headers)
+            config.headers.append('ofte-sessionid', sessionID)
+            return fetch(url, config)
+                .then(resp => {
+                    broadcastEvent('ofte-fetch', url)
+                    return resp
+                })
         }
 
         /*
-            fetchStrong makes a backend request but first generating a request token from the continous authentication
-            session. It's a more secure form of request.
+            fetchStrong makes a backend request by first generating a one time request token from 
+            the continous authentication session. It's a more secure form of fetch.
         */
-        impl.fetchStrong = function (method, url, data, contentType = 'application/json', timeout = impl.config.networkTimeout) {
+        impl.fetchStrong = function (url, config = {}) {
             if (sessionID === '') {
                 throw new Error('SessionID is null')
             }
@@ -220,23 +232,27 @@ THE SOFTWARE.
                     request.onload = async function () {
                         if (this.status == 200) {
                             resetTimer(sessionID)
-                            let token = this.getResponseHeader('Ofte-AccessToken')
-                            await getResponse(resolve, reject, method, url, data, [['Ofte-SessionID', sessionID], ['Ofte-AccessToken', token]], contentType, timeout)
-                                .then(() => {
+                            config.headers = new Headers(config.headers)
+                            config.headers.append('Ofte-SessionID', sessionID)
+                            config.headers.append('Ofte-AccessToken', this.getResponseHeader('Ofte-AccessToken'))
+                            await fetch(url, config)
+                                .then(resp => {
                                     if (impl.config.debug) {
                                         console.log('fetchStrong took ' + (performance.now() - t0) + ' milliseconds');
                                     }
-                                    broadcastEvent('ofte-access', url)
+                                    broadcastEvent('ofte-fetch-strong', url)
+                                    resolve(resp)
                                 })
-                                .catch((err) => {
+                                .catch(err => {
                                     broadcastEvent('ofte-error', err)
+                                    reject(err)
                                 })
                         } else {
-                            throw new Error(this.response.responseText)
+                            reject(new Error(this.response.responseText))
                         }
                     };
                     request.onerror = function () {
-                        throw new Error('Connection error')
+                        reject(new Error('Connection error'))
                     };
 
                     request.send(JSON.stringify(resp))
@@ -248,14 +264,13 @@ THE SOFTWARE.
                 request.onload = function () {
                     if (this.status == 200) {
                         let req = JSON.parse(request.responseText)
-                        //u2f.sign(req.appId, req.challenge, req.registeredKeys, callback, 30);
                         u2fApi.u2fSign(req.appId, req.challenge, req.registeredKeys, callback, 10);
                     } else {
-                        throw new Error(this.response.responseText)
+                        reject(new Error(this.response.responseText))
                     }
                 };
                 request.onerror = function () {
-                    throw new Error('Connection error')
+                    reject(new Error('Connection error'))
                 };
                 request.send()
             })
@@ -269,64 +284,74 @@ THE SOFTWARE.
             let session = sessionID
             sessionID = ''
             broadcastEvent('ofte-end-session', session)
-            return getResponsePromise('POST', impl.config.authServiceURL + '/auth/v1/end_session/' + session)
+            postJSONData(impl.config.authServiceURL + '/auth/v1/end_session/' + session)
         }
 
         // Private functions
         // --------- • ---------
 
-        const status = response => {
-            if (response.status >= 200 && response.status < 300) {
-                return Promise.resolve(response)
-            }
-            console.log('error response', response)
-            return Promise.reject(new Error(response.statusText))
-        }
-
-        const json = response => response.json()
-
         async function getJSONData(url) {
+            let error = false
             return await fetch(url)
-                .then(status)
-                .then(json)
+                .then(response => {
+                    if (response.status < 200 || response.status >= 300) {
+                        error = true
+                    }
+                    return response.json()
+                })
+                .then(obj => {
+                    if (error) {
+                        throw new Error(obj.error)
+                    }
+                    return obj
+                })
         }
 
         async function postJSONData(url, data = {}) {
             let options = {
                 method: 'POST',
-                credentials: 'omit', // include, *same-origin, omit
             }
             if (!hasJSONStructure(data)) {
                 options.body = JSON.stringify(data)
             }
+            let error = false
             return await fetch(url, options)
-                .then(status)
-                .then(json)
+                .then(response => {
+                    if (response.status < 200 || response.status >= 300) {
+                        error = true
+                    }
+                    return response.json()
+                })
+                .then(obj => {
+                    if (error) {
+                        throw new Error(obj.error)
+                    }
+                    return obj
+                })
         }
 
         async function registerFIDOKey(username) {
             return new Promise(async (resolve, reject) => {
-
                 await getJSONData(ofte.config.authServiceURL + '/auth/v1/start_fido_registration/' + username)
                     .then(credentialCreationOptions => {
-                        credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge);
-                        credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id);
+                        credentialCreationOptions.publicKey.challenge = bufferDecode(credentialCreationOptions.publicKey.challenge)
+                        credentialCreationOptions.publicKey.user.id = bufferDecode(credentialCreationOptions.publicKey.user.id)
                         if (credentialCreationOptions.publicKey.excludeCredentials) {
                             for (var i = 0; i < credentialCreationOptions.publicKey.excludeCredentials.length; i++) {
-                                credentialCreationOptions.publicKey.excludeCredentials[i].id = bufferDecode(credentialCreationOptions.publicKey.excludeCredentials[i].id);
+                                credentialCreationOptions.publicKey.excludeCredentials[i].id = bufferDecode(credentialCreationOptions.publicKey.excludeCredentials[i].id)
                             }
                         }
-                        if (impl.debug) {
-                            console.log('inbound create options: ', credentialCreationOptions.publicKey);
+                        if (impl.config.debug) {
+                            console.log('inbound create options: ', credentialCreationOptions.publicKey)
                         }
                         return navigator.credentials.create({
                             publicKey: credentialCreationOptions.publicKey
                         })
                     })
-                    .then(async credential => {
-                        let attestationObject = credential.response.attestationObject;
-                        let clientDataJSON = credential.response.clientDataJSON;
-                        let rawId = credential.rawId;
+                    .then(credential => {
+                        let attestationObject = credential.response.attestationObject
+                        let clientDataJSON = credential.response.clientDataJSON
+                        let rawId = credential.rawId
 
                         let data = {
                             id: credential.id,
@@ -336,6 +361,9 @@ THE SOFTWARE.
                                 attestationObject: bufferEncode(attestationObject),
                                 clientDataJSON: bufferEncode(clientDataJSON),
                             },
+                        }
+                        if (impl.config.debug) {
+                            console.log('attestation Object: ', attestationObject)
                         }
                         return postJSONData(impl.config.authServiceURL + '/auth/v1/finish_fido_registration/' + username, data)
                     })
@@ -447,7 +475,7 @@ THE SOFTWARE.
                     if (this.status == 200) {
                         broadcastEvent('ofte-key-assert', sessionID)
                     } else {
-                        throw new Error(this.response.responseText)
+                        impl.endSession()
                     }
                 };
                 request.onerror = function () {
@@ -465,7 +493,7 @@ THE SOFTWARE.
                     //u2f.sign(req.appId, req.challenge, req.registeredKeys, callback, 30);
                     u2fApi.u2fSign(req.appId, req.challenge, req.registeredKeys, callback, 10);
                 } else {
-                    throw new Error(this.response.responseText)
+                    impl.endSession()
                 }
             };
             request.onerror = function () {
@@ -498,7 +526,12 @@ THE SOFTWARE.
         }
 
         function startCA() {
-            ofteAssert()
+            try {
+                ofteAssert()
+            } catch (err) {
+                console.log(err)
+                return
+            }
             timer = window.setTimeout(startCA, impl.config.interval)
         }
 
@@ -1446,7 +1479,6 @@ THE SOFTWARE.
             });
     }
     function sign(appId, signRequests, timeout) {
-        debugger
         var _signRequests = arrayify(signRequests);
         return getBackend()
             .then(function (backend) {
