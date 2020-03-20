@@ -178,3 +178,8 @@ func main() {
 For Java-based backends, Spring MVC *interceptors* can be used in a similar way to check for HTTP Headers that need to be validated via REST to our services. Other language/environments use similar interceptor/middleware constructs and Ofte would integrate cleanly into those as well. As demand for languages is made known, we'll add libraries for those environments in this repository.
 
 [Let us know](mailto:info@ofte.io) what environments you're interested in working with, and we'll prioritize those. And of course if you have questions, don't hesitate to open an issue or [mail us](mailto:info@ofte.io).
+
+#### Admin REST
+Ofte Services includes a REST API with which you can manage principals and keys that Ofte is controlling. There are options to manage keys by AAGUID as well.
+
+An example application that uses this API can be reviewed in /example/admin.
