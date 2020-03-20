@@ -156,8 +156,9 @@
   <script src='https://cdn.jsdelivr.net/npm/babel-polyfill/dist/polyfill.min.js'></script>
   <script src='https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js'></script>
   <script src='https://cdn.jsdelivr.net/npm/vuetify@2.2.8/dist/vuetify.min.js'></script>
-  <script src="https://cdn.ofte.io/js/latest/ofte.min.js" data-service-host="https://localhost:2357" data-debug="true">
-  </script>
+
+  <!-- change to cdn for out of workspace testing -->
+  <script src="ofte.js" data-debug="true"></script>
 
   <script>
     new Vue({
@@ -223,17 +224,14 @@
       },
       methods: {
         registerNewAuthenticator(uname) {
-          console.log('index:260')
           ofte.registerKey(this.username)
             .then((key) => {
-              console.log('index:262')
               this.flowStep = 3
             })
             .catch(error => {
               console.log("error", error)
               return
             })
-            console.log('index:269')
         },
         addTimelineEvent(event) {
           const time = new Date().toISOString().substr(11, 8) + " GMT"
@@ -244,7 +242,8 @@
           })
         },
         async fetch() {
-          await ofte.fetch("GET", "https://localhost:2357/test_resource_endpoint_session_only/123")
+          await ofte.fetch("https://localhost:2357/test_resource_endpoint_session_only/123")
+            .then((resp) => resp.text())
             .then((resp) => {
               this.addTimelineEvent({ text: "Access URI\n" + resp });
             })
@@ -253,7 +252,8 @@
             })
         },
         async fetchStrong() {
-          await ofte.fetchStrong("GET", "https://localhost:2357/test_resource_endpoint/123")
+          await ofte.fetchStrong("https://localhost:2357/test_resource_endpoint/123")
+            .then((resp) => resp.text())
             .then((resp) => {
               this.addTimelineEvent({ text: "Access URI Strong\n" + resp });
             })
@@ -287,10 +287,10 @@
         });
         document.addEventListener('ofte-session-start', function (event) {
           _this.addTimelineEvent({ text: "CA session initiated" })
-        }),
-          document.addEventListener('ofte-key-assert', function (event) {
-            _this.addTimelineEvent({ text: "CA session (" + _this.sessionID + ") keep-alive" })
-          });
+        });
+        document.addEventListener('ofte-key-assert', function (event) {
+          _this.addTimelineEvent({ text: "CA session (" + _this.sessionID + ") keep-alive" })
+        });
       },
     });
   </script>
