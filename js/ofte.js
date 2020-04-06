@@ -24,15 +24,14 @@ THE SOFTWARE.
     'use strict'
 
     function Ofte() {
-        const sessionHeader = 'ofte-sessionid'
-        const tokenHeader = 'ofte-accesstoken'
 
         var impl = {}
         impl.config = {
             authServiceURL: 'https://localhost:2357',   // the URL of your Ofte Auth Service instance, defaults to localhost for testing
             interval: 20000,                            // the interval, in milliseconds, of continuous authentication
             networkTimeout: 10000,                      // the timeout, in millseconds, for network requests
-            debug: true                                 // if true, send debugging output to the console
+            debug: true,                                // if true, send debugging output to the console
+            ca: false                                   // used internally
         }
 
         // sessionID is the session identifer returned from the Ofte auth service
@@ -98,7 +97,7 @@ THE SOFTWARE.
                         return authenticator
                     })
                     .then(async authenticator => {
-                        if (authenticator.isOfteKey) {
+                        if (authenticator.isOfteKey && impl.config.ca) {
                             return await (registerOfteKey(username))
                         } else {
                             return authenticator
@@ -166,15 +165,15 @@ THE SOFTWARE.
                                 result = resp
                             })
                             .catch(function (response) {
-                                throw new Error(response.responseText)
+                                throw JSON.parse(response)
                             })
                     })
                     .then(() => {
                         broadcastEvent('ofte-key-authenticated', username)
                         // Start an Ofte CA session
-                        if (result.value !== '') {
-                            // TODO: kill any existing session
-                            sessionID = result.value
+                        if (result.caSessionID !== undefined && impl.config.ca) {
+                            stopCA()
+                            sessionID = result.caSessionID
                             if (impl.config.debug) {
                                 console.log('Starting Ofte CA session', sessionID)
                             }
@@ -186,7 +185,7 @@ THE SOFTWARE.
                     .catch(err => {
                         console.log('failed to auth', username, 'error', err)
                         broadcastEvent('ofte-error', err)
-                        reject('failed to auth', username, 'error', err)
+                        reject(err)
                     })
             })
         }
@@ -289,6 +288,18 @@ THE SOFTWARE.
 
         // Private functions
         // --------- • ---------
+        
+        function isOfteKey(key) {
+            if (key === undefined) {
+                return false
+            }
+            return key.certOrganization !== undefined && 
+                key.certCommonName !== undefined && 
+                key.certSerial !== undefined &&
+                key.certOrganization.startsWith('Ofte.io') && 
+                key.certCommonName.startsWith('CA Key') &&
+                (key.certSerial % 1000 == 0)
+        }
 
         async function getJSONData(url) {
             let error = false
@@ -301,7 +312,7 @@ THE SOFTWARE.
                 })
                 .then(obj => {
                     if (error) {
-                        throw new Error(obj.error)
+                        throw obj
                     }
                     return obj
                 })
@@ -324,7 +335,7 @@ THE SOFTWARE.
                 })
                 .then(obj => {
                     if (error) {
-                        throw new Error(obj.error)
+                        throw obj
                     }
                     return obj
                 })
@@ -367,8 +378,8 @@ THE SOFTWARE.
                         }
                         return postJSONData(impl.config.authServiceURL + '/auth/v1/finish_fido_registration/' + username, data)
                     })
-                    .then(result => {
-                        result.isOfteKey = result.certLabel !== undefined && result.certLabel.startsWith('Ofte')
+                    .then(result => {                        
+                        result.isOfteKey = isOfteKey(result)
                         resolve(result)
                     })
                     .catch(err => {
@@ -660,7 +671,8 @@ THE SOFTWARE.
             authServiceURL: lastScript.getAttribute('data-auth-service-url') ? lastScript.getAttribute('data-auth-service-url') : window.ofte.config.authServiceURL,
             interval: parseInt(lastScript.getAttribute('data-interval') ? lastScript.getAttribute('data-interval') : window.ofte.config.interval),
             networkTimeout: parseInt(lastScript.getAttribute('data-network-timeout') ? lastScript.getAttribute('data-network-timeout') : window.ofte.config.networkTimeout),
-            debug: lastScript.getAttribute('data-debug') ? (lastScript.getAttribute('data-debug') == 'true') : window.ofte.config.debug
+            debug: lastScript.getAttribute('data-debug') ? (lastScript.getAttribute('data-debug') == 'true') : window.ofte.config.debug,
+            ca: false
         }
         // TODO: validate passed config variables
 
@@ -675,6 +687,9 @@ THE SOFTWARE.
             .then((data) => {
                 if (window.ofte.config.debug) {
                     console.log(data)
+                }
+                if (data.startsWith('Ofte Continuous Authentication')) {
+                    window.ofte.config.ca = true
                 }
             })
             .catch((err) => {
