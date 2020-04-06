@@ -1,6 +1,6 @@
 # Ofte Developer Resources
 
-This document covers the intricate details of integrating Ofte into your platform. See https://ofte.io for more general information about our continuous authentication platform.
+This document covers the technical details of integrating Ofte into your platform. See https://ofte.io for more general information about our continuous authentication platform.
 
 Integrating Ofte into your web application involves two simple steps
 
