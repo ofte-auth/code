@@ -8,7 +8,7 @@ Vue.component("key-list", {
       <td class="text-xs-left">{{ props.item.state }}</td>
       <td class="text-xs-left">{{ props.item.username }}</td>
       <td class="text-xs-left">{{ props.item.aaguid }}</td>
-      <td class="text-xs-left">{{ props.item.certLabel }}</td>
+      <td class="text-xs-left">{{ props.item.certCommonName }}</td>
       <td class="text-xs-left">{{ props.item.lastUsed }}</td>
       <td class="text-xs-left">{{ props.item.createdAt }}</td>
       <td class="text-xs-right">
@@ -61,7 +61,9 @@ Vue.component("key-list", {
                         var reformattedArray = data.data.map(obj => {
                             var rObj = obj
                             rObj["createdAt"] = moment(obj["createdAt"]).format(this.dateFormat) + " " + this.tzName
-                            rObj["lastUsed"] = obj["lastUsed"] == null ? "-" : moment(obj["lastSeen"]).format(this.dateFormat) + " " + this.tzName
+                            rObj["lastUsed"] = obj["lastUsed"] == null ? "-" : moment(obj["lastUsed"]).format(this.dateFormat) + " " + this.tzName
+                            rObj["id"] = obj["id"].substring(0, 8) + '...'
+                            rObj["certCommonName"] = obj["certOrganization"] + " " + obj["certCommonName"]
                             return rObj;
                         });
                         this.loading = false
@@ -79,6 +81,8 @@ Vue.component("key-list", {
                 var rObj = obj
                 rObj["createdAt"] = moment(obj["createdAt"]).format(this.dateFormat) + " " + this.tzName
                 rObj["lastUsed"] = obj["lastUsed"] == null ? "-" : moment(obj["lastUsed"]).format(this.dateFormat) + " " + this.tzName
+                rObj["id"] = obj["id"].substring(0, 8) + '...'
+                rObj["certCommonName"] = obj["certOrganization"] + " " + obj["certCommonName"]
                 return rObj;
             });
             this.loading = false
@@ -107,7 +111,7 @@ Vue.component("key-list", {
         deleteItem(item) {
             this.$refs.confirmDelete.open('Delete key', 'Are you sure? This will disable the continuous authentication feature if this is an Ofte Key.', { color: 'red' }).then((confirm) => {
                 if (confirm) {
-                    let url = this.adminAPIEndpoint + "/admin/v1/keys/" + encodeURIComponent(item.id)
+                    let url = this.adminAPIEndpoint + "/admin/v1/keys/" + item.id
                     axios.delete(url)
                         .then(() => {
                             console.log('key deleted')
@@ -121,7 +125,7 @@ Vue.component("key-list", {
         disable(item) {
             this.$refs.confirmDelete.open('Disable key', 'Are you sure? Any active session will be closed and the user will not be able to authenticate.', { color: 'red' }).then((confirm) => {
                 if (confirm) {
-                    let url = this.adminAPIEndpoint + "/admin/v1/keys/" + encodeURIComponent(item.id)
+                    let url = this.adminAPIEndpoint + "/admin/v1/keys/" + item.id
                     axios.put(url, {"state": "revoked"})
                         .then(() => {
                             console.log('key disabled')
@@ -135,7 +139,7 @@ Vue.component("key-list", {
         enable(item) {
             this.$refs.confirmDelete.open('Enable key', 'Are you sure?', { color: 'red' }).then((confirm) => {
                 if (confirm) {
-                    let url = this.adminAPIEndpoint + "/admin/v1/keys/" + encodeURIComponent(item.id)
+                    let url = this.adminAPIEndpoint + "/admin/v1/keys/" + item.id
                     axios.put(url, {"state": "active"})
                         .then(() => {
                             console.log('key enabled')

@@ -74,7 +74,7 @@ Vue.component("audit-list", {
             const { sortBy, descending, page, rowsPerPage } = this.pagination
 
             let url = this.adminAPIEndpoint + "/admin/v1/logs?"
-            const queryParams = { 'orderBy': sortBy, 'orderDirection': descending ? "DESC" : "ASC", 'page': page, 'limit': rowsPerPage };
+            const queryParams = { 'group': 'auth', 'orderBy': sortBy, 'orderDirection': descending ? 'DESC' : 'ASC', 'page': page, 'limit': rowsPerPage };
             url += this.encodeQueryData(queryParams)
 
             return axios.get(url)
@@ -82,22 +82,19 @@ Vue.component("audit-list", {
 
         displayData(data) {
             let total = parseInt(data.headers["results-total"])
-            //if (this.totalEntries == total) {
-            //    this.loading = false
-            //    return
-            //}
             let now = moment()
             var reformattedArray = data.data.map(obj => {
                 var rObj = obj
-                //rObj["ts"] = moment(obj["ts"]).format(this.dateFormat)
-                let then = moment(obj["timestamp"])
+                let then = moment(obj["createdAt"])
                 let display = then.fromNow()
                 if (now.diff(then, "days") < 1) {
                     display += " at " + then.format("h:mm:ss a")
                 } else {
                     display += " on " + then.format("MMM DD")
                 }
-                rObj["ts"] = display
+                rObj["createdAt"] = display
+
+                rObj["fidoKeyId"] = obj["fidoKeyId"].substring(0, 8) + '...'
                 return rObj;
             });
             this.loading = false

@@ -57,6 +57,16 @@
                             </v-list-tile-content>
                         </v-list-tile>
                     </router-link>
+                    <router-link to="/aaguids" style="text-decoration: none; color: inherit">
+                        <v-list-tile @click="">
+                            <v-list-tile-action>
+                                <v-icon>label</v-icon>
+                            </v-list-tile-action>
+                            <v-list-tile-content>
+                                <v-list-tile-title>AAGUIDs</v-list-tile-title>
+                            </v-list-tile-content>
+                        </v-list-tile>
+                    </router-link>
                 </v-list>
             </v-navigation-drawer>
             <v-toolbar color="indigo" dark fixed app>
@@ -81,8 +91,10 @@
     <script src='./pages/login.vue.js'></script>
     <script src='./pages/keys.vue.js'></script>
     <script src='./pages/users.vue.js'></script>
+    <script src='./pages/aaguids.vue.js'></script>
     <script src='./pages/components/keylist.vue.js'></script>
     <script src='./pages/components/userlist.vue.js'></script>
+    <script src='./pages/components/aaguidlist.vue.js'></script>
     <script src='./pages/components/confirmdialog.vue.js'></script>
     <script src='./pages/components/sessionlist.vue.js'></script>
     <script src='./pages/components/auditlist.vue.js'></script>
@@ -116,6 +128,10 @@
         {
             path: '/users',
             component: adminUsers
+        },
+        {
+            path: '/aaguids',
+            component: adminAAGUIDs
         }
         ]
 
