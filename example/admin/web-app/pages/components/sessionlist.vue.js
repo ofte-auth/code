@@ -52,6 +52,7 @@ Vue.component("session-list", {
                         var reformattedArray = data.data.map(obj => {
                             var rObj = obj
                             rObj["ts"] = moment(obj["ts"]).format(this.dateFormat)
+                            rObj["keyId"] = obj["keyId"].substring(0, 8) + '...'
                             return rObj;
                         });
                         this.loading = false
@@ -68,6 +69,7 @@ Vue.component("session-list", {
                 var reformattedArray = data.data.map(obj => {
                     var rObj = obj
                     rObj["ts"] = moment(obj["ts"]).format(this.dateFormat)
+                    rObj["keyId"] = obj["keyId"].substring(0, 8) + '...'
                     return rObj;
                 });
                 this.loading = false
