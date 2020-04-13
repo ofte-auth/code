@@ -688,7 +688,7 @@ THE SOFTWARE.
                 if (window.ofte.config.debug) {
                     console.log(data)
                 }
-                if (data.startsWith('Ofte Continuous Authentication')) {
+                if (data.startsWith('Ofte CA')) {
                     window.ofte.config.ca = true
                 }
             })
