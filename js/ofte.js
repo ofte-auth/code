@@ -283,7 +283,7 @@ THE SOFTWARE.
             let session = sessionID
             sessionID = ''
             broadcastEvent('ofte-end-session', session)
-            postJSONData(impl.config.authServiceURL + '/auth/v1/end_session/' + session)
+            return postJSONData(impl.config.authServiceURL + '/auth/v1/end_session/' + session)
         }
 
         // Private functions
