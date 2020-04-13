@@ -70,7 +70,7 @@ THE SOFTWARE.
                 getResponse(resolve, reject, 'POST', impl.config.authServiceURL + '/auth/v1/principals', principalData)
             })
                 .then(resp => {
-                    resp.hasKey = resp.fidoKeys !== null && resp.fidoKeys.length > 0
+                    resp.hasKey = resp.fidoKeys !== undefined && resp.fidoKeys.length > 0
                     return resp
                 })
         }
@@ -449,7 +449,7 @@ THE SOFTWARE.
             xhr.ontimeout = function (err) {
                 reject('Network timeout error' + err)
             }
-            if (data !== null) {
+            if (data !== undefined) {
                 xhr.setRequestHeader('Content-Type', contentType)
                 switch (contentType) {
                     case 'application/json':
